@@ -10,48 +10,54 @@
     <div id="toolbar">
         <div class="tool-group">
             <strong>Tools:</strong>
-            <button id="mode-point" class="active" onclick="setMode('point')">Point</button>
-            <button id="mode-line" onclick="setMode('line')">Line</button>
-            <button id="mode-circle" onclick="setMode('circle')">Circle</button>
-            <button id="mode-arc" onclick="setMode('arc')" title="Center -> Start -> End">Arc</button>
-            <button id="mode-parabola" onclick="setMode('parabola')">Parabola</button>
-            <button id="mode-text" onclick="setMode('text')">Free Text</button>
+            <button id="mode-point" class="active" onclick="setMode('point')" title="Click the canvas to add a coordinate point">Point</button>
+            <button id="mode-line" onclick="setMode('line')" title="Click two points to connect them with a straight line">Line</button>
+            <button id="mode-circle" onclick="setMode('circle')" title="Click a center point, then click a point on the circumference">Circle</button>
+            <button id="mode-arc" onclick="setMode('arc')" title="Click 1 point to set the center of the arc">Circular Arc</button>
+            <button id="mode-elliptic-arc" onclick="setMode('elliptic-arc')" title="Click 2 points to set the foci of the ellipse">Elliptic Arc</button>
+            <button id="mode-text" onclick="setMode('text')" title="Click anywhere to add free-floating text or LaTeX math">Free Text</button>
             <div class="divider"></div>
-            <button id="mode-select" onclick="setMode('select')">Select (Arrow)</button>
-            <button id="mode-move" onclick="setMode('move')">Move</button>
+            <button id="mode-select" onclick="setMode('select')" title="Select an item to edit its properties">Select (Arrow)</button>
+            <button id="mode-move" onclick="setMode('move')" title="Click and drag points or text to move them">Move</button>
         </div>
         
         <div class="tool-group properties-panel">
             <strong>Properties:</strong>
-            <input type="text" id="prop-label" placeholder="Label..." disabled style="width: 70px;">
-            <select id="prop-label-pos" disabled title="Label Position">
-                <option value="above">Above</option>
-                <option value="below">Below</option>
-                <option value="left">Left</option>
-                <option value="right">Right</option>
+            <input type="text" id="prop-label" placeholder="Label..." disabled style="width: 70px;" title="Text Label or Equation">
+            
+            <input type="number" id="prop-label-angle" disabled title="Angle of the point label (0 to 360 degrees)" style="width: 50px; display: none;" placeholder="Ang°">
+            
+            <select id="prop-label-pos" disabled title="Position of the label relative to the line" style="display: none;">
+                <option value="above" title="Place label above the line">Above</option>
+                <option value="below" title="Place label below the line">Below</option>
+                <option value="sloped" title="Place label directly on the line">Sloped</option>
             </select>
             
+            <input type="number" id="prop-radius" disabled title="Radius or Semi-Major Axis" style="width: 55px; display: none;" placeholder="Radius">
+            <input type="number" id="prop-angle-start" disabled title="Starting Angle (Degrees)" style="width: 55px; display: none;" placeholder="Start°">
+            <input type="number" id="prop-angle-end" disabled title="Ending Angle (Degrees)" style="width: 55px; display: none;" placeholder="End°">
+
             <div class="divider"></div>
             
-            <select id="prop-arrow" disabled title="Line Arrows">
+            <select id="prop-arrow" disabled title="Add directional arrows to lines">
                 <option value="none">No Arrow</option>
                 <option value="end">End -></option>
                 <option value="start">Start <-</option>
                 <option value="both">Both <-></option>
             </select>
             
-            <div class="custom-select" id="color-picker">
+            <div class="custom-select" id="color-picker" title="Change item color">
                 <div class="select-selected" id="current-color">
                     <span class="color-box" style="background: Black;"></span> Black
                 </div>
                 <div class="select-items select-hide" id="color-list"></div>
             </div>
             
-            <select id="point-style" title="Point Style">
+            <select id="point-style" title="Change point style">
                 <option value="solid">Solid Dot</option>
                 <option value="none">Hollow Dot</option>
             </select>
-            <select id="line-style" title="Line Style">
+            <select id="line-style" title="Change line style">
                 <option value="solid">Solid Line</option>
                 <option value="dashed">Dashed Line</option>
                 <option value="dotted">Dotted Line</option>
@@ -59,36 +65,36 @@
         </div>
 
         <div class="tool-group">
-            <button onclick="zoomIn()">Zoom +</button>
-            <button onclick="zoomOut()">Zoom -</button>
-            <label><input type="checkbox" id="toggle-grid" checked onchange="draw()"> Grid</label>
-            <label><input type="checkbox" id="snap-grid" checked> Snap</label>
+            <button onclick="zoomIn()" title="Zoom in (+)">Zoom +</button>
+            <button onclick="zoomOut()" title="Zoom out (-)">Zoom -</button>
+            <label title="Show or hide the background grid"><input type="checkbox" id="toggle-grid" checked onchange="draw()"> Grid</label>
+            <label title="Snap points exactly to grid intersections"><input type="checkbox" id="snap-grid" checked> Snap</label>
         </div>
     </div>
     
     <div id="workspace">
         <div id="left-panel">
             <div id="canvas-container">
-                <canvas id="graphCanvas"></canvas>
+                <canvas id="graphCanvas" title="Graph Drawing Area"></canvas>
             </div>
         </div>
         
-        <div id="resizer"></div>
+        <div id="resizer" title="Drag to resize panels"></div>
         
         <div id="right-panel">
             <div class="output-header">
                 <h3>Generated Code:</h3>
                 <div>
-                    <button onclick="exportJSON()">Save JSON</button>
-                    <button onclick="document.getElementById('file-import').click()">Load JSON</button>
+                    <button onclick="exportJSON()" title="Download graph as JSON to save your work">Save JSON</button>
+                    <button onclick="document.getElementById('file-import').click()" title="Load a previously saved JSON graph">Load JSON</button>
                     <input type="file" id="file-import" style="display: none;" accept=".json" onchange="importJSON(event)">
-                    <select id="code-format" onchange="draw()">
+                    <select id="code-format" onchange="draw()" title="Choose output LaTeX format">
                         <option value="pstricks">PSTricks</option>
                         <option value="tikz">TikZ</option>
                     </select>
                 </div>
             </div>
-            <textarea id="codeOutput" readonly></textarea>
+            <textarea id="codeOutput" readonly title="Copy this code into your LaTeX document"></textarea>
             <p style="font-size: 11px; color: #666; margin-top: 5px;">* Select any item and press <b>Delete</b> on your keyboard to remove it.</p>
         </div>
     </div>

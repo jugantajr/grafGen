@@ -6,7 +6,7 @@ body { font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: colum
 .tool-group:last-child { border-right: none; }
 .divider { width: 1px; height: 20px; background: #ccc; margin: 0 5px; }
 
-button, select, input[type="text"] { padding: 6px 10px; border: 1px solid #bbb; border-radius: 4px; background: #fff; font-size: 13px; }
+button, select, input[type="text"], input[type="number"] { padding: 6px 10px; border: 1px solid #bbb; border-radius: 4px; background: #fff; font-size: 13px; }
 button { cursor: pointer; }
 button:hover, select:hover { background: #e9ecef; }
 button.active { background: #007bff; color: white; border-color: #0056b3; }
@@ -23,15 +23,15 @@ input:disabled, select:disabled { background: #eee; cursor: not-allowed; }
 
 /* Split Pane Workspace */
 #workspace { display: flex; flex: 1; min-height: 0; }
-#left-panel { flex: 0 0 55%; background: #e0e0e0; display: flex; justify-content: center; align-items: center; overflow: auto; position: relative; }
-#resizer { width: 8px; background: #ccc; cursor: col-resize; z-index: 10; display: flex; justify-content: center; align-items: center; border-left: 1px solid #aaa; border-right: 1px solid #aaa; }
+#left-panel { flex: 0 0 55%; display: flex; overflow: hidden; position: relative; background: white; }
+#resizer { width: 8px; background: #ccc; cursor: col-resize; z-index: 10; display: flex; justify-content: center; align-items: center; border-left: 1px solid #aaa; border-right: 1px solid #aaa; flex-shrink: 0;}
 #resizer::after { content: "⋮"; color: #666; font-size: 18px; }
-#right-panel { flex: 1; display: flex; flex-direction: column; background: white; padding: 15px; overflow: hidden; }
+#right-panel { flex: 1; display: flex; flex-direction: column; background: #fafafa; padding: 15px; overflow: hidden; }
 
 /* Canvas & Code */
-#canvas-container { width: 600px; height: 600px; background: white; border: 1px solid #999; box-shadow: 0 4px 10px rgba(0,0,0,0.2); flex-shrink: 0; margin: 20px; }
-canvas { display: block; }
+#canvas-container { width: 100%; height: 100%; background: white; margin: 0; padding: 0; position: relative; overflow: hidden; }
+canvas { display: block; width: 100%; height: 100%; }
 
 .output-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
 h3 { margin: 0; color: #333; font-size: 16px; }
-textarea { flex: 1; width: 100%; font-family: monospace; font-size: 13px; padding: 10px; resize: none; border: 1px solid #ccc; border-radius: 4px; background: #fafafa; box-sizing: border-box; white-space: pre; }
+textarea { flex: 1; width: 100%; font-family: monospace; font-size: 13px; padding: 10px; resize: none; border: 1px solid #ccc; border-radius: 4px; background: #fff; box-sizing: border-box; white-space: pre; }
