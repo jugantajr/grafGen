@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pro Graph Code Builder</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -19,18 +21,18 @@
             <div class="divider"></div>
             <button id="mode-select" onclick="setMode('select')" title="Select an item to edit its properties">Select (Arrow)</button>
             <button id="mode-move" onclick="setMode('move')" title="Click and drag points or text to move them">Move</button>
+            <button id="mode-delete" onclick="setMode('delete')" title="Click any item to erase it">Eraser</button>
         </div>
         
         <div class="tool-group properties-panel">
             <strong>Properties:</strong>
             <input type="text" id="prop-label" placeholder="Label..." disabled style="width: 70px;" title="Text Label or Equation">
-            
             <input type="number" id="prop-label-angle" disabled title="Angle of the point label (0 to 360 degrees)" style="width: 50px; display: none;" placeholder="Ang°">
             
             <select id="prop-label-pos" disabled title="Position of the label relative to the line" style="display: none;">
-                <option value="above" title="Place label above the line">Above</option>
-                <option value="below" title="Place label below the line">Below</option>
-                <option value="sloped" title="Place label directly on the line">Sloped</option>
+                <option value="above">Above</option>
+                <option value="below">Below</option>
+                <option value="sloped">Sloped</option>
             </select>
             
             <input type="number" id="prop-radius" disabled title="Radius or Semi-Major Axis" style="width: 55px; display: none;" placeholder="Radius">
@@ -62,6 +64,8 @@
                 <option value="dashed">Dashed Line</option>
                 <option value="dotted">Dotted Line</option>
             </select>
+
+            <button id="prop-delete-btn" class="danger" disabled onclick="deleteSelected()" title="Delete selected item" style="margin-left: 5px;">🗑️</button>
         </div>
 
         <div class="tool-group">
@@ -69,6 +73,7 @@
             <button onclick="zoomOut()" title="Zoom out (-)">Zoom -</button>
             <label title="Show or hide the background grid"><input type="checkbox" id="toggle-grid" checked onchange="draw()"> Grid</label>
             <label title="Snap points exactly to grid intersections"><input type="checkbox" id="snap-grid" checked> Snap</label>
+            <button onclick="clearAll()" class="danger" title="Clear entire canvas" style="margin-left: 10px;">Clear All</button>
         </div>
     </div>
     
