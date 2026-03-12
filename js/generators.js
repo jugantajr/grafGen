@@ -38,7 +38,13 @@ window.generateCode = function() {
 
         points.forEach((p) => {
             let fill = p.style === 'solid' ? `fillstyle=solid, fillcolor=${p.color}` : `fillstyle=solid, fillcolor=white`;
-            let lbl = p.label !== "" ? ` \\uput[${p.angle}](${p.x},${p.y}){ $${p.label}$}` : "";
+            
+            // Map text positions to PSTricks angles
+            let ang = 90;
+            if (p.labelPos === 'above') ang = 90; else if (p.labelPos === 'below') ang = 270;
+            else if (p.labelPos === 'left') ang = 180; else if (p.labelPos === 'right') ang = 0;
+            
+            let lbl = p.label !== "" ? ` \\uput[${ang}](${p.x},${p.y}){ $${p.label}$}` : "";
             latex += `    \\cnode[${fill}, linecolor=${p.color}](${p.x},${p.y}){\\r}{n${p.id}}${lbl}\n`;
         });
         latex += `\n`;
@@ -50,16 +56,18 @@ window.generateCode = function() {
             
             let lbl = "";
             if (e.label && e.label !== "") {
-                let posMap = { "above": "npos=0.5", "below": "npos=0.5", "sloped": "nrot=:U" };
-                lbl = ` \\ncput*[${posMap[e.labelPos] || ""}]{ $${e.label}$}`;
+                if (e.labelPos === 'above') lbl = ` \\naput{ $${e.label}$}`;
+                else if (e.labelPos === 'below') lbl = ` \\nbput{ $${e.label}$}`;
+                else lbl = ` \\ncput*[npos=0.5]{ $${e.label}$}`;
             }
 
             let p1 = points.find(p => p.id === e.sourceId); let p2 = points.find(p => p.id === e.targetId);
             if (!p1 || !p2) return;
 
-            let arrowCmd = e.type === 'arrow' ? '{->}' : '{}';
+            let arrowCmd = '{}';
+            if (e.arrow === 'end') arrowCmd = '{->}'; else if (e.arrow === 'start') arrowCmd = '{<-}'; else if (e.arrow === 'both') arrowCmd = '{<->}';
 
-            if (e.type === 'line' || e.type === 'arrow') {
+            if (e.type === 'line') {
                 latex += `    \\ncline[${st}]${arrowCmd}{n${e.sourceId}}{n${e.targetId}}${lbl}\n`;
             } else if (e.type === 'circle') {
                 let r = Math.hypot(p2.x - p1.x, p2.y - p1.y).toFixed(2);
@@ -89,7 +97,7 @@ window.generateCode = function() {
         latex += `\\begin{tikzpicture}\n    \\draw[help lines, step=1.0] (${b.minX},${b.minY}) grid (${b.maxX},${b.maxY});\n\n`;
         points.forEach((p) => {
             let fill = p.style === 'solid' ? p.color : 'white';
-            let lbl = p.label !== "" ? `, label={${p.angle}: $${p.label}$}` : '';
+            let lbl = p.label !== "" ? `, label={${p.labelPos}: $${p.label}$}` : '';
             latex += `    \\node[circle, draw=${p.color}, fill=${fill}, inner sep=1.5pt${lbl}] (n${p.id}) at (${p.x},${p.y}) {};\n`;
         });
         latex += `\n`;
@@ -97,16 +105,17 @@ window.generateCode = function() {
             let st = e.style === 'dashed' ? ', dashed' : e.style === 'dotted' ? ', dotted' : '';
             let lbl = "";
             if (e.label && e.label !== "") {
-                let pos = e.labelPos === "sloped" ? "sloped, above" : e.labelPos;
+                let pos = e.labelPos === 'sloped' ? 'sloped, above' : e.labelPos;
                 lbl = ` node[fill=white, inner sep=1pt, ${pos}] { $${e.label}$}`;
             }
 
             let p1 = points.find(p => p.id === e.sourceId); let p2 = points.find(p => p.id === e.targetId);
             if (!p1 || !p2) return;
 
-            let arrowCmd = e.type === 'arrow' ? '->, ' : '';
+            let arrowCmd = '';
+            if (e.arrow === 'end') arrowCmd = '->, '; else if (e.arrow === 'start') arrowCmd = '<-, '; else if (e.arrow === 'both') arrowCmd = '<->, ';
 
-            if (e.type === 'line' || e.type === 'arrow') {
+            if (e.type === 'line') {
                 latex += `    \\draw[${arrowCmd}${e.color}${st}, thick] (n${e.sourceId}) --${lbl} (n${e.targetId});\n`;
             } else if (e.type === 'circle') {
                 let r = Math.hypot(p2.x - p1.x, p2.y - p1.y).toFixed(2);

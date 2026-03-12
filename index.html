@@ -12,7 +12,6 @@
             <strong>Tools:</strong>
             <button id="mode-point" class="active" onclick="setMode('point')">Point</button>
             <button id="mode-line" onclick="setMode('line')">Line</button>
-            <button id="mode-arrow" onclick="setMode('arrow')">Directed Edge</button>
             <button id="mode-circle" onclick="setMode('circle')">Circle</button>
             <button id="mode-arc" onclick="setMode('arc')" title="Center -> Start -> End">Arc</button>
             <button id="mode-parabola" onclick="setMode('parabola')">Parabola</button>
@@ -23,14 +22,22 @@
         </div>
         
         <div class="tool-group properties-panel">
-            <strong>Selected Item Properties:</strong>
-            <input type="text" id="prop-label" placeholder="Text Label..." disabled>
-            <select id="prop-label-pos" disabled>
+            <strong>Properties:</strong>
+            <input type="text" id="prop-label" placeholder="Label..." disabled style="width: 70px;">
+            <select id="prop-label-pos" disabled title="Label Position">
                 <option value="above">Above</option>
                 <option value="below">Below</option>
                 <option value="left">Left</option>
                 <option value="right">Right</option>
-                <option value="sloped">Sloped</option>
+            </select>
+            
+            <div class="divider"></div>
+            
+            <select id="prop-arrow" disabled title="Line Arrows">
+                <option value="none">No Arrow</option>
+                <option value="end">End -></option>
+                <option value="start">Start <-</option>
+                <option value="both">Both <-></option>
             </select>
             
             <div class="custom-select" id="color-picker">
@@ -39,10 +46,15 @@
                 </div>
                 <div class="select-items select-hide" id="color-list"></div>
             </div>
-            <select id="item-style">
-                <option value="solid">Solid</option>
-                <option value="dashed">Dashed / Hollow</option>
-                <option value="dotted">Dotted</option>
+            
+            <select id="point-style" title="Point Style">
+                <option value="solid">Solid Dot</option>
+                <option value="none">Hollow Dot</option>
+            </select>
+            <select id="line-style" title="Line Style">
+                <option value="solid">Solid Line</option>
+                <option value="dashed">Dashed Line</option>
+                <option value="dotted">Dotted Line</option>
             </select>
         </div>
 
@@ -77,7 +89,7 @@
                 </div>
             </div>
             <textarea id="codeOutput" readonly></textarea>
-            <p style="font-size: 11px; color: #666; margin-top: 5px;">* Select an item and press <b>Delete</b> or <b>Backspace</b> on your keyboard to remove it.</p>
+            <p style="font-size: 11px; color: #666; margin-top: 5px;">* Select any item and press <b>Delete</b> on your keyboard to remove it.</p>
         </div>
     </div>
 
