@@ -24,6 +24,20 @@
             <button id="mode-delete" onclick="setMode('delete')" title="Click any item to erase it">Eraser</button>
         </div>
         
+        <div class="tool-group" style="background: #eef2f5; border-radius: 4px; padding: 4px 10px; border: 1px solid #ccd6e0;">
+            <strong style="color: #0056b3;">Macros:</strong>
+            <select id="macro-type" onchange="toggleMacroInputs()" title="Select standard graph shape">
+                <option value="Kn">Complete (Kn)</option>
+                <option value="Cn">Cycle (Cn)</option>
+                <option value="Star">Star (K1,n)</option>
+                <option value="Pn">Path (Pn)</option>
+                <option value="Km,n">Bipartite (Km,n)</option>
+            </select>
+            <input type="number" id="macro-n" value="5" min="1" max="50" style="width: 45px;" title="Nodes (n)">
+            <input type="number" id="macro-m" value="3" min="1" max="50" style="width: 45px; display: none;" title="Left Partition (m)">
+            <button onclick="insertMacro()" style="background: #28a745; color: white; border-color: #218838; font-weight: bold;" title="Instantly draw this graph">Insert</button>
+        </div>
+
         <div class="tool-group properties-panel">
             <strong>Properties:</strong>
             <input type="text" id="prop-label" placeholder="Label..." disabled style="width: 70px;" title="Text Label or Equation">
@@ -73,7 +87,11 @@
             <button onclick="zoomOut()" title="Zoom out (-)">Zoom -</button>
             <label title="Show or hide the background grid"><input type="checkbox" id="toggle-grid" checked onchange="draw()"> Grid</label>
             <label title="Snap points exactly to grid intersections"><input type="checkbox" id="snap-grid" checked> Snap</label>
-            <button onclick="clearAll()" class="danger" title="Clear entire canvas" style="margin-left: 10px;">Clear All</button>
+            
+            <div class="divider"></div>
+            <button onclick="toggleLayout()" title="Switch layout for mobile devices" style="font-weight: bold; background: #343a40; color: white;">↕️ Layout</button>
+            
+            <button onclick="clearAll()" class="danger" title="Clear entire canvas" style="margin-left: 5px;">Clear</button>
         </div>
     </div>
     

@@ -2,7 +2,7 @@ body { font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: colum
 
 /* Toolbar */
 #toolbar { display: flex; flex-wrap: wrap; gap: 10px; background: white; padding: 10px 15px; border-bottom: 1px solid #ccc; box-shadow: 0 2px 4px rgba(0,0,0,0.05); z-index: 20; }
-.tool-group { display: flex; align-items: center; gap: 6px; border-right: 1px solid #eee; padding-right: 15px; font-size: 13px; }
+.tool-group { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; border-right: 1px solid #eee; padding-right: 15px; font-size: 13px; }
 .tool-group:last-child { border-right: none; }
 .divider { width: 1px; height: 20px; background: #ccc; margin: 0 5px; }
 
@@ -22,24 +22,28 @@ input:disabled, select:disabled { background: #eee; cursor: not-allowed; }
 .select-item:hover { background: #007bff; color: white; }
 
 /* Split Pane Workspace */
-#workspace { display: flex; flex: 1; min-height: 0; }
+#workspace { display: flex; flex: 1; min-height: 0; flex-direction: row; }
 #left-panel { flex: 0 0 55%; display: flex; overflow: hidden; position: relative; background: white; }
+
 #resizer { width: 8px; background: #ccc; cursor: col-resize; z-index: 10; display: flex; justify-content: center; align-items: center; border-left: 1px solid #aaa; border-right: 1px solid #aaa; flex-shrink: 0;}
 #resizer::after { content: "⋮"; color: #666; font-size: 18px; }
+
 #right-panel { flex: 1; display: flex; flex-direction: column; background: #fafafa; padding: 15px; overflow: hidden; }
+
+/* 📱 VERTICAL LAYOUT OVERRIDES (Top/Bottom) */
+#workspace.vertical-layout { flex-direction: column; }
+#workspace.vertical-layout #resizer { width: 100%; height: 8px; cursor: row-resize; border-top: 1px solid #aaa; border-bottom: 1px solid #aaa; border-left: none; border-right: none; }
+#workspace.vertical-layout #resizer::after { content: "⋯"; display: flex; align-items: center; height: 100%; font-size: 22px; line-height: 0px; }
 
 /* Canvas & Math Overlays */
 #canvas-container { width: 100%; height: 100%; background: white; margin: 0; padding: 0; position: relative; overflow: hidden; }
-canvas { display: block; width: 100%; height: 100%; }
+canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 
 .math-overlay {
-    position: absolute;
-    transform: translate(-50%, -50%);
-    pointer-events: none; /* CRITICAL: Lets you click "through" the math to select it on the canvas! */
-    font-size: 16px;
-    z-index: 5;
+    position: absolute; transform: translate(-50%, -50%);
+    pointer-events: none; font-size: 16px; z-index: 5;
 }
 
-.output-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.output-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 5px; }
 h3 { margin: 0; color: #333; font-size: 16px; }
 textarea { flex: 1; width: 100%; font-family: monospace; font-size: 13px; padding: 10px; resize: none; border: 1px solid #ccc; border-radius: 4px; background: #fff; box-sizing: border-box; white-space: pre; }

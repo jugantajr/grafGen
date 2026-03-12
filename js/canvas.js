@@ -23,7 +23,9 @@ const resizeObserver = new ResizeObserver(entries => {
 resizeObserver.observe(document.getElementById('canvas-container'));
 
 window.points = []; window.edges = []; window.texts = []; 
-let pointIdCounter = 0; let edgeIdCounter = 0; let textIdCounter = 0;
+// Made global so macros can safely increment them
+window.pointIdCounter = 0; window.edgeIdCounter = 0; window.textIdCounter = 0;
+
 let currentMode = 'point'; 
 let selectedPointId = null; let selectedEdgeId = null; let selectedTextId = null;
 let isDragging = false; let draggedPointId = null; let draggedTextId = null;
@@ -36,9 +38,7 @@ window.zoomIn = function() { window.zoom *= 1.2; draw(); }
 window.zoomOut = function() { window.zoom *= 0.8; draw(); }
 
 function screenToMath(sx, sy, ignoreObjectSnap = false) {
-    let u = getUnitSize();
-    let mx = (sx - originX) / u;
-    let my = (originY - sy) / u;
+    let u = getUnitSize(); let mx = (sx - originX) / u; let my = (originY - sy) / u;
     activeSnapLineX = null; activeSnapLineY = null;
     if (document.getElementById('snap-grid').checked) { mx = Math.round(mx * 2) / 2; my = Math.round(my * 2) / 2; }
     if (!ignoreObjectSnap && (isDragging || currentMode === 'point')) {
@@ -59,14 +59,12 @@ window.setMode = function(mode, keepSelection = false) {
     document.querySelectorAll('.tool-group button').forEach(btn => btn.classList.remove('active'));
     let btn = document.getElementById(`mode-${mode}`); if(btn) btn.classList.add('active');
     
-    // Change cursor based on mode
     if (mode === 'move') canvas.style.cursor = 'grab';
     else if (mode === 'select') canvas.style.cursor = 'pointer';
     else if (mode === 'delete') canvas.style.cursor = 'not-allowed';
     else canvas.style.cursor = 'crosshair';
 
-    if (window.updatePropertyPanel) window.updatePropertyPanel();
-    draw();
+    if (window.updatePropertyPanel) window.updatePropertyPanel(); draw();
 }
 
 function distToSegment(px, py, x1, y1, x2, y2) {
@@ -101,6 +99,101 @@ window.clearAll = function() {
         updatePropertyPanel(); draw();
     }
 };
+
+// ==========================================
+// GRAPH GENERATOR (MACROS)
+// ==========================================
+window.toggleMacroInputs = function() {
+    let type = document.getElementById('macro-type').value;
+    document.getElementById('macro-m').style.display = (type === 'Km,n') ? 'inline-block' : 'none';
+};
+
+window.insertMacro = function() {
+    let type = document.getElementById('macro-type').value;
+    let n = parseInt(document.getElementById('macro-n').value) || 5;
+    let m = parseInt(document.getElementById('macro-m').value) || 3;
+    
+    // Scale radius automatically so large graphs don't squish together
+    let r = Math.max(3, n * 0.5); 
+    
+    let newPts = [];
+    let startLbl = window.points.length + 1;
+
+    // Viewport Center Offset (spawns graph where you are currently looking)
+    let cx = (canvasWidth / 2 - originX) / getUnitSize();
+    let cy = (originY - canvasHeight / 2) / getUnitSize();
+
+    if (type === 'Kn' || type === 'Cn') {
+        for (let i = 0; i < n; i++) {
+            let angle = -Math.PI/2 + (i * 2 * Math.PI) / n; 
+            let deg = Math.round((-angle * 180 / Math.PI + 360) % 360);
+            let id = window.pointIdCounter++;
+            window.points.push({ 
+                id, x: cx + r * Math.cos(angle), y: cy - r * Math.sin(angle), 
+                color: window.activeColor, style: 'solid', label: String(startLbl + i), labelAngle: deg 
+            });
+            newPts.push(id);
+        }
+        if (type === 'Cn') {
+            for (let i = 0; i < n; i++) {
+                window.edges.push({ id: window.edgeIdCounter++, type: 'line', sourceId: newPts[i], targetId: newPts[(i+1)%n], color: window.activeColor, style: 'solid', arrow: 'none', label: "", labelPos: 'above' });
+            }
+        } else { // Kn
+            for (let i = 0; i < n; i++) {
+                for (let j = i+1; j < n; j++) {
+                    window.edges.push({ id: window.edgeIdCounter++, type: 'line', sourceId: newPts[i], targetId: newPts[j], color: window.activeColor, style: 'solid', arrow: 'none', label: "", labelPos: 'above' });
+                }
+            }
+        }
+    } 
+    else if (type === 'Star') {
+        let centerId = window.pointIdCounter++;
+        window.points.push({ id: centerId, x: cx, y: cy, color: window.activeColor, style: 'solid', label: String(startLbl), labelAngle: 90 });
+        for (let i = 0; i < n; i++) {
+            let angle = -Math.PI/2 + (i * 2 * Math.PI) / n;
+            let deg = Math.round((-angle * 180 / Math.PI + 360) % 360);
+            let leafId = window.pointIdCounter++;
+            window.points.push({ id: leafId, x: cx + r * Math.cos(angle), y: cy - r * Math.sin(angle), color: window.activeColor, style: 'solid', label: String(startLbl + 1 + i), labelAngle: deg });
+            window.edges.push({ id: window.edgeIdCounter++, type: 'line', sourceId: centerId, targetId: leafId, color: window.activeColor, style: 'solid', arrow: 'none', label: "", labelPos: 'above' });
+        }
+    } 
+    else if (type === 'Pn') {
+        let startX = cx - ((n-1) * 2) / 2;
+        for (let i = 0; i < n; i++) {
+            let id = window.pointIdCounter++;
+            window.points.push({ id, x: startX + i*2, y: cy, color: window.activeColor, style: 'solid', label: String(startLbl + i), labelAngle: 90 });
+            newPts.push(id);
+        }
+        for (let i = 0; i < n-1; i++) {
+            window.edges.push({ id: window.edgeIdCounter++, type: 'line', sourceId: newPts[i], targetId: newPts[i+1], color: window.activeColor, style: 'solid', arrow: 'none', label: "", labelPos: 'above' });
+        }
+    } 
+    else if (type === 'Km,n') {
+        let setA = []; let setB = [];
+        let rBip = Math.max(3, Math.max(m, n) * 0.5);
+        let startYa = cy + ((m-1) * 2) / 2;
+        let startYb = cy + ((n-1) * 2) / 2;
+        
+        for (let i = 0; i < m; i++) {
+            let id = window.pointIdCounter++; setA.push(id);
+            window.points.push({ id, x: cx - rBip, y: startYa - i*2, color: window.activeColor, style: 'solid', label: String(startLbl + i), labelAngle: 180 });
+        }
+        for (let i = 0; i < n; i++) {
+            let id = window.pointIdCounter++; setB.push(id);
+            window.points.push({ id, x: cx + rBip, y: startYb - i*2, color: window.activeColor, style: 'solid', label: String(startLbl + m + i), labelAngle: 0 });
+        }
+        for (let a of setA) {
+            for (let b of setB) {
+                window.edges.push({ id: window.edgeIdCounter++, type: 'line', sourceId: a, targetId: b, color: window.activeColor, style: 'solid', arrow: 'none', label: "", labelPos: 'above' });
+            }
+        }
+    }
+    
+    window.setMode('select'); 
+    draw();
+};
+// ==========================================
+
 
 function updatePropertyPanel() {
     const lblInput = document.getElementById('prop-label'); const angInput = document.getElementById('prop-label-angle');
@@ -203,7 +296,6 @@ canvas.addEventListener('mousedown', (e) => {
         if (eObj) eId = eObj.id;
     }
 
-    // NEW: Eraser / Delete Tool Logic
     if (currentMode === 'delete') {
         if (pId !== null) {
             window.points = window.points.filter(p => p.id !== pId);
@@ -227,7 +319,7 @@ canvas.addEventListener('mousedown', (e) => {
         if (window.updatePropertyPanel) window.updatePropertyPanel();
     } 
     else if (currentMode === 'point' && !pId) {
-        let m = screenToMath(mx, my); let newId = pointIdCounter++;
+        let m = screenToMath(mx, my); let newId = window.pointIdCounter++;
         window.points.push({ id: newId, x: m.x, y: m.y, color: window.activeColor, style: 'solid', label: String(window.points.length + 1) });
         selectedPointId = newId; setMode('select', true);
     } 
@@ -246,7 +338,7 @@ canvas.addEventListener('mousedown', (e) => {
         input.onblur = () => {
             if(isFinished) return; isFinished = true;
             if (input.value) {
-                let newId = textIdCounter++;
+                let newId = window.textIdCounter++;
                 window.texts.push({ id: newId, x: m.x, y: m.y, text: input.value, color: window.activeColor });
                 selectedTextId = newId; setMode('select', true);
             }
@@ -256,13 +348,13 @@ canvas.addEventListener('mousedown', (e) => {
     else if (['line', 'circle'].includes(currentMode) && pId !== null) {
         if (selectedPointId === null) selectedPointId = pId;
         else if (selectedPointId !== pId) {
-            let newId = edgeIdCounter++;
+            let newId = window.edgeIdCounter++;
             window.edges.push({ id: newId, type: currentMode, sourceId: selectedPointId, targetId: pId, color: window.activeColor, style: 'solid', arrow: 'none', label: "", labelPos: 'above' });
             selectedPointId = null; selectedEdgeId = newId; setMode('select', true);
         }
     } 
     else if (currentMode === 'arc' && pId !== null) {
-        let newId = edgeIdCounter++;
+        let newId = window.edgeIdCounter++;
         window.edges.push({ id: newId, type: 'arc', sourceId: pId, radius: 2, startAngle: 0, endAngle: 90, color: window.activeColor, style: 'solid', arrow: 'none', label: "", labelPos: 'above' });
         selectedEdgeId = newId; setMode('select', true);
     } 
@@ -270,7 +362,7 @@ canvas.addEventListener('mousedown', (e) => {
         if (selectedPointId === null) selectedPointId = pId;
         else if (selectedPointId !== pId) {
             let p1 = window.points.find(p=>p.id===selectedPointId); let p2 = window.points.find(p=>p.id===pId);
-            let c = Math.hypot(p2.x-p1.x, p2.y-p1.y)/2; let newId = edgeIdCounter++;
+            let c = Math.hypot(p2.x-p1.x, p2.y-p1.y)/2; let newId = window.edgeIdCounter++;
             window.edges.push({ id: newId, type: 'elliptic-arc', sourceId: selectedPointId, targetId: pId, radius: Math.ceil(c+1), startAngle: 0, endAngle: 180, color: window.activeColor, style: 'solid', arrow: 'none', label: "", labelPos: 'above' });
             selectedPointId = null; selectedEdgeId = newId; setMode('select', true);
         }
@@ -294,20 +386,14 @@ canvas.addEventListener('mousemove', (e) => {
 
 window.addEventListener('mouseup', () => { 
     isPanning = false; isDragging = false; draggedPointId = null; draggedTextId = null; activeSnapLineX = null; activeSnapLineY = null; 
-    
-    // Reset cursor after dragging
     if (currentMode === 'move') canvas.style.cursor = 'grab';
     else if (currentMode === 'select') canvas.style.cursor = 'pointer';
-    
     draw(); 
 });
 
 window.addEventListener('keydown', (e) => {
-    // FIX: Ignore keyboard presses if typing in a text box or dropdown
     if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
-    if (e.key === 'Delete' || e.key === 'Backspace') {
-        window.deleteSelected();
-    }
+    if (e.key === 'Delete' || e.key === 'Backspace') { window.deleteSelected(); }
 });
 
 function drawArrowhead(ctx, x, y, angle, color) {
@@ -379,7 +465,7 @@ window.draw = function() {
             overlay.style.left = midX + 'px'; overlay.style.top = (midY + oY) + 'px';
             overlay.style.transform = 'translate(-50%, -50%)';
             overlay.style.color = window.getHexFromName(e.color);
-            overlay.style.pointerEvents = 'none'; // CRITICAL
+            overlay.style.pointerEvents = 'none'; 
             document.getElementById('canvas-container').appendChild(overlay);
             try { katex.render(e.label, overlay); } catch(err) { overlay.innerText = e.label; }
         }
@@ -394,7 +480,7 @@ window.draw = function() {
         overlay.style.left = s.x + 'px'; overlay.style.top = s.y + 'px';
         overlay.style.transform = 'translate(-50%, -50%)';
         overlay.style.color = window.getHexFromName(t.color);
-        overlay.style.pointerEvents = 'none'; // CRITICAL
+        overlay.style.pointerEvents = 'none'; 
         document.getElementById('canvas-container').appendChild(overlay);
         try { katex.render(t.text, overlay); } catch(err) { overlay.innerText = t.text; }
     });
@@ -413,7 +499,7 @@ window.draw = function() {
             overlay.style.left = (s.x + Math.cos(r)*20) + 'px'; overlay.style.top = (s.y - Math.sin(r)*20) + 'px';
             overlay.style.transform = 'translate(-50%, -50%)';
             overlay.style.color = '#333';
-            overlay.style.pointerEvents = 'none'; // CRITICAL
+            overlay.style.pointerEvents = 'none'; 
             document.getElementById('canvas-container').appendChild(overlay);
             try { katex.render(p.label, overlay); } catch(err) { overlay.innerText = p.label; }
         }
@@ -421,3 +507,19 @@ window.draw = function() {
 
     if (window.generateCode) window.generateCode();
 };
+
+window.exportJSON = function() {
+    let a = document.createElement('a'); a.download = "graph_data.json";
+    a.href = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({points: window.points, edges: window.edges, texts: window.texts, originX, originY, zoom: window.zoom}, null, 2)); a.click();
+}
+window.importJSON = function(e) {
+    let reader = new FileReader();
+    reader.onload = function(ev) {
+        let obj = JSON.parse(ev.target.result); window.points = obj.points || []; window.edges = obj.edges || []; window.texts = obj.texts || [];
+        if (obj.originX !== undefined) originX = obj.originX; if (obj.originY !== undefined) originY = obj.originY; if (obj.zoom !== undefined) window.zoom = obj.zoom;
+        window.pointIdCounter = window.points.length ? Math.max(...window.points.map(p=>p.id))+1 : 0; 
+        window.edgeIdCounter = window.edges.length ? Math.max(...window.edges.map(e=>e.id))+1 : 0; 
+        window.textIdCounter = window.texts.length ? Math.max(...window.texts.map(t=>t.id))+1 : 0;
+        draw();
+    }; reader.readAsText(e.target.files[0]);
+}

@@ -1,20 +1,70 @@
 const resizer = document.getElementById('resizer');
 const leftSide = document.getElementById('left-panel');
-let isResizing = false; let startX, startWidth;
+const workspace = document.getElementById('workspace');
 
-resizer.addEventListener('mousedown', (e) => {
-    isResizing = true; startX = e.clientX; startWidth = leftSide.getBoundingClientRect().width;
-    document.body.style.cursor = 'col-resize';
-});
+let isResizing = false; 
+let startX, startY, startWidth, startHeight;
+let isVertical = false;
 
-document.addEventListener('mousemove', (e) => {
+// NEW: Toggle UI Layout
+window.toggleLayout = function() {
+    workspace.classList.toggle('vertical-layout');
+    isVertical = workspace.classList.contains('vertical-layout');
+    // Force canvas to recalculate its dimensions instantly
+    window.dispatchEvent(new Event('resize'));
+};
+
+// Start Resizing (Handles both Mouse and Mobile Touch)
+function initResize(e) {
+    isResizing = true; 
+    let clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    let clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+    if (isVertical) {
+        startY = clientY; 
+        startHeight = leftSide.getBoundingClientRect().height;
+        document.body.style.cursor = 'row-resize';
+    } else {
+        startX = clientX; 
+        startWidth = leftSide.getBoundingClientRect().width;
+        document.body.style.cursor = 'col-resize';
+    }
+}
+
+// Drag Resizing (Handles both Mouse and Mobile Touch)
+function doResize(e) {
     if (!isResizing) return;
-    const newWidth = startWidth + (e.clientX - startX);
-    const parentWidth = resizer.parentNode.getBoundingClientRect().width;
-    leftSide.style.flex = `0 0 ${(newWidth / parentWidth) * 100}%`;
-});
-document.addEventListener('mouseup', () => { isResizing = false; document.body.style.cursor = 'default'; });
+    let clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    let clientY = e.touches ? e.touches[0].clientY : e.clientY;
 
+    if (isVertical) {
+        const newHeight = startHeight + (clientY - startY);
+        const parentHeight = resizer.parentNode.getBoundingClientRect().height;
+        leftSide.style.flex = `0 0 ${(newHeight / parentHeight) * 100}%`;
+    } else {
+        const newWidth = startWidth + (clientX - startX);
+        const parentWidth = resizer.parentNode.getBoundingClientRect().width;
+        leftSide.style.flex = `0 0 ${(newWidth / parentWidth) * 100}%`;
+    }
+}
+
+// Stop Resizing
+function stopResize() {
+    isResizing = false; 
+    document.body.style.cursor = 'default';
+}
+
+// Attach Resizer Events
+resizer.addEventListener('mousedown', initResize);
+resizer.addEventListener('touchstart', initResize, {passive: true});
+
+document.addEventListener('mousemove', doResize);
+document.addEventListener('touchmove', doResize, {passive: true});
+
+document.addEventListener('mouseup', stopResize);
+document.addEventListener('touchend', stopResize);
+
+// Standard LaTeX Default Colors
 const basicColors = [
     { name: "black", hex: "#000000" }, { name: "gray", hex: "#808080" },
     { name: "white", hex: "#FFFFFF" }, { name: "red", hex: "#FF0000" },
