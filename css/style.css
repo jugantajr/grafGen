@@ -1,0 +1,37 @@
+body { font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; margin: 0; background: #f4f4f9; height: 100vh; overflow: hidden; }
+
+/* Toolbar */
+#toolbar { display: flex; flex-wrap: wrap; gap: 10px; background: white; padding: 10px 15px; border-bottom: 1px solid #ccc; box-shadow: 0 2px 4px rgba(0,0,0,0.05); z-index: 20; }
+.tool-group { display: flex; align-items: center; gap: 6px; border-right: 1px solid #eee; padding-right: 15px; font-size: 13px; }
+.tool-group:last-child { border-right: none; }
+.divider { width: 1px; height: 20px; background: #ccc; margin: 0 5px; }
+
+button, select, input[type="text"] { padding: 6px 10px; border: 1px solid #bbb; border-radius: 4px; background: #fff; font-size: 13px; }
+button { cursor: pointer; }
+button:hover, select:hover { background: #e9ecef; }
+button.active { background: #007bff; color: white; border-color: #0056b3; }
+input:disabled, select:disabled { background: #eee; cursor: not-allowed; }
+
+/* Custom Color Picker */
+.custom-select { position: relative; display: inline-block; cursor: pointer; border: 1px solid #bbb; border-radius: 4px; background: #fff; font-size: 13px; min-width: 100px; user-select: none; }
+.select-selected { padding: 6px 10px; display: flex; align-items: center; gap: 8px; }
+.color-box { width: 14px; height: 14px; border: 1px solid #666; display: inline-block; border-radius: 2px;}
+.select-items { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #bbb; z-index: 99; max-height: 250px; overflow-y: auto; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+.select-hide { display: none; }
+.select-item { padding: 6px 10px; display: flex; align-items: center; gap: 8px; }
+.select-item:hover { background: #007bff; color: white; }
+
+/* Split Pane Workspace */
+#workspace { display: flex; flex: 1; min-height: 0; }
+#left-panel { flex: 0 0 55%; background: #e0e0e0; display: flex; justify-content: center; align-items: center; overflow: auto; position: relative; }
+#resizer { width: 8px; background: #ccc; cursor: col-resize; z-index: 10; display: flex; justify-content: center; align-items: center; border-left: 1px solid #aaa; border-right: 1px solid #aaa; }
+#resizer::after { content: "⋮"; color: #666; font-size: 18px; }
+#right-panel { flex: 1; display: flex; flex-direction: column; background: white; padding: 15px; overflow: hidden; }
+
+/* Canvas & Code */
+#canvas-container { width: 600px; height: 600px; background: white; border: 1px solid #999; box-shadow: 0 4px 10px rgba(0,0,0,0.2); flex-shrink: 0; margin: 20px; }
+canvas { display: block; }
+
+.output-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+h3 { margin: 0; color: #333; font-size: 16px; }
+textarea { flex: 1; width: 100%; font-family: monospace; font-size: 13px; padding: 10px; resize: none; border: 1px solid #ccc; border-radius: 4px; background: #fafafa; box-sizing: border-box; white-space: pre; }

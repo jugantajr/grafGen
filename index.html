@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pro Graph Code Builder</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div id="toolbar">
+        <div class="tool-group">
+            <strong>Tools:</strong>
+            <button id="mode-point" class="active" onclick="setMode('point')">Point</button>
+            <button id="mode-line" onclick="setMode('line')">Line</button>
+            <button id="mode-arrow" onclick="setMode('arrow')">Directed Edge</button>
+            <button id="mode-circle" onclick="setMode('circle')">Circle</button>
+            <button id="mode-arc" onclick="setMode('arc')" title="Center -> Start -> End">Arc</button>
+            <button id="mode-parabola" onclick="setMode('parabola')">Parabola</button>
+            <button id="mode-text" onclick="setMode('text')">Free Text</button>
+            <div class="divider"></div>
+            <button id="mode-select" onclick="setMode('select')">Select (Arrow)</button>
+            <button id="mode-move" onclick="setMode('move')">Move</button>
+        </div>
+        
+        <div class="tool-group properties-panel">
+            <strong>Selected Item Properties:</strong>
+            <input type="text" id="prop-label" placeholder="Text Label..." disabled>
+            <select id="prop-label-pos" disabled>
+                <option value="above">Above</option>
+                <option value="below">Below</option>
+                <option value="left">Left</option>
+                <option value="right">Right</option>
+                <option value="sloped">Sloped</option>
+            </select>
+            
+            <div class="custom-select" id="color-picker">
+                <div class="select-selected" id="current-color">
+                    <span class="color-box" style="background: Black;"></span> Black
+                </div>
+                <div class="select-items select-hide" id="color-list"></div>
+            </div>
+            <select id="item-style">
+                <option value="solid">Solid</option>
+                <option value="dashed">Dashed / Hollow</option>
+                <option value="dotted">Dotted</option>
+            </select>
+        </div>
+
+        <div class="tool-group">
+            <button onclick="zoomIn()">Zoom +</button>
+            <button onclick="zoomOut()">Zoom -</button>
+            <label><input type="checkbox" id="toggle-grid" checked onchange="draw()"> Grid</label>
+            <label><input type="checkbox" id="snap-grid" checked> Snap</label>
+        </div>
+    </div>
+    
+    <div id="workspace">
+        <div id="left-panel">
+            <div id="canvas-container">
+                <canvas id="graphCanvas"></canvas>
+            </div>
+        </div>
+        
+        <div id="resizer"></div>
+        
+        <div id="right-panel">
+            <div class="output-header">
+                <h3>Generated Code:</h3>
+                <div>
+                    <button onclick="exportJSON()">Save JSON</button>
+                    <button onclick="document.getElementById('file-import').click()">Load JSON</button>
+                    <input type="file" id="file-import" style="display: none;" accept=".json" onchange="importJSON(event)">
+                    <select id="code-format" onchange="draw()">
+                        <option value="pstricks">PSTricks</option>
+                        <option value="tikz">TikZ</option>
+                    </select>
+                </div>
+            </div>
+            <textarea id="codeOutput" readonly></textarea>
+            <p style="font-size: 11px; color: #666; margin-top: 5px;">* Select an item and press <b>Delete</b> or <b>Backspace</b> on your keyboard to remove it.</p>
+        </div>
+    </div>
+
+    <script src="js/ui.js"></script>
+    <script src="js/generators.js"></script>
+    <script src="js/canvas.js"></script>
+</body>
+</html>
