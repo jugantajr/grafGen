@@ -11,17 +11,17 @@ function getBounds() {
     });
     window.edges.forEach(e => {
         let p1 = window.points.find(p => p.id === e.sourceId); if (!p1) return;
-        if(e.type === 'circle') {
-            let p2 = window.points.find(p => p.id === e.targetId);
-            if(p2) {
-                let r = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-                if(p1.x - r < minX) minX = Math.floor(p1.x - r); if(p1.x + r > maxX) maxX = Math.ceil(p1.x + r);
-                if(p1.y - r < minY) minY = Math.floor(p1.y - r); if(p1.y + r > maxY) maxY = Math.ceil(p1.y + r);
-            }
-        } else if (e.type === 'arc') {
+        if (e.type === 'circle' || e.type === 'arc') {
             let r = e.radius;
             if(p1.x - r < minX) minX = Math.floor(p1.x - r); if(p1.x + r > maxX) maxX = Math.ceil(p1.x + r);
             if(p1.y - r < minY) minY = Math.floor(p1.y - r); if(p1.y + r > maxY) maxY = Math.ceil(p1.y + r);
+        } else if (e.type === 'curve') {
+            let p2 = window.points.find(p => p.id === e.targetId);
+            if (p2) {
+                let r = Math.abs(e.offset); // Rough bounds expansion for curves
+                if(p1.x - r < minX) minX = Math.floor(p1.x - r); if(p1.x + r > maxX) maxX = Math.ceil(p1.x + r);
+                if(p1.y - r < minY) minY = Math.floor(p1.y - r); if(p1.y + r > maxY) maxY = Math.ceil(p1.y + r);
+            }
         } else if (e.type === 'elliptic-arc') {
             let p2 = window.points.find(p => p.id === e.targetId);
             if (p2) {
@@ -59,26 +59,38 @@ window.generateCode = function() {
             if (e.style === 'dashed') st += ", linestyle=dashed";
             if (e.style === 'dotted') st += ", linestyle=dotted";
             
+            // LABEL POSITIONING FOR PSTRICKS
             let lbl = "";
             if (e.label && e.label !== "") {
-                if (e.labelPos === 'above') lbl = ` \\naput{ $${e.label}$}`; else if (e.labelPos === 'below') lbl = ` \\nbput{ $${e.label}$}`; else lbl = ` \\ncput*[npos=0.5]{ $${e.label}$}`;
+                if (e.labelPos === 'above') lbl = ` \\naput{ $${e.label}$}`; 
+                else if (e.labelPos === 'below') lbl = ` \\nbput{ $${e.label}$}`; 
+                else if (e.labelPos === 'left') lbl = ` \\ncput{\\uput[180](0,0){ $${e.label}$}}`; 
+                else if (e.labelPos === 'right') lbl = ` \\ncput{\\uput[0](0,0){ $${e.label}$}}`; 
+                else if (e.labelPos === 'on') lbl = ` \\ncput*{ $${e.label}$}`; // The star '*' fills background white
+                else lbl = ` \\naput{ $${e.label}$}`; // fallback
             }
 
-            let p1 = window.points.find(p => p.id === e.sourceId); let p2 = window.points.find(p => p.id === e.targetId);
+            let p1 = window.points.find(p => p.id === e.sourceId);
             if (!p1) return;
 
-            // FIX: If no arrow is selected, output empty string, NOT brackets
             let arrowCmd = '';
             if (e.arrow === 'end') arrowCmd = '{->}'; else if (e.arrow === 'start') arrowCmd = '{<-}'; else if (e.arrow === 'both') arrowCmd = '{<->}';
 
             if (e.type === 'line') {
-                if (!p2) return; latex += `    \\ncline[${st}]${arrowCmd}{n${e.sourceId}}{n${e.targetId}}${lbl}\n`;
+                let p2 = window.points.find(p => p.id === e.targetId); if (!p2) return;
+                latex += `    \\ncline[${st}]${arrowCmd}{n${e.sourceId}}{n${e.targetId}}${lbl}\n`;
+            } else if (e.type === 'curve') {
+                let p2 = window.points.find(p => p.id === e.targetId); if (!p2) return;
+                let len = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+                let angle = 2 * Math.atan2(e.offset, len / 2) * 180 / Math.PI; 
+                latex += `    \\ncarc[${st}, arcangle=${angle.toFixed(1)}]${arrowCmd}{n${e.sourceId}}{n${e.targetId}}${lbl}\n`;
             } else if (e.type === 'circle') {
-                if (!p2) return; let r = Math.hypot(p2.x - p1.x, p2.y - p1.y).toFixed(2); latex += `    \\pscircle[${st}](${p1.x},${p1.y}){${r}}\n`;
+                latex += `    \\pscircle[${st}](${p1.x},${p1.y}){${e.radius}}\n`;
             } else if (e.type === 'arc') {
                 latex += `    \\psarc[${st}]${arrowCmd}(${p1.x},${p1.y}){${e.radius}}{${e.startAngle}}{${e.endAngle}}\n`;
             } else if (e.type === 'elliptic-arc') {
-                if (!p2) return; let c = Math.hypot(p2.x - p1.x, p2.y - p1.y) / 2; let a = Math.max(e.radius, c + 0.001); let b = Math.sqrt(a*a - c*c).toFixed(2);
+                let p2 = window.points.find(p => p.id === e.targetId); if (!p2) return;
+                let c = Math.hypot(p2.x - p1.x, p2.y - p1.y) / 2; let a = Math.max(e.radius, c + 0.001); let b = Math.sqrt(a*a - c*c).toFixed(2);
                 let rot = (Math.atan2(p2.y - p1.y, p2.x - p1.x) * 180 / Math.PI).toFixed(2);
                 let cx = ((p1.x + p2.x)/2).toFixed(2); let cy = ((p1.y + p2.y)/2).toFixed(2);
                 latex += `    \\rput{${rot}}(${cx},${cy}){\\psellipticarc[${st}]${arrowCmd}(0,0)(${a},${b}){${e.startAngle}}{${e.endAngle}}}\n`;
@@ -87,7 +99,6 @@ window.generateCode = function() {
         
         if (window.texts.length > 0) latex += `\n`;
         window.texts.forEach(t => { latex += `    \\rput(${t.x},${t.y}){${t.color === 'black' ? `$${t.text}$` : `\\textcolor{${t.color}}{$${t.text}$}`}}\n`; });
-
         latex += `\\end{pspicture}`;
         
     } else { // TikZ
@@ -103,26 +114,43 @@ window.generateCode = function() {
         
         window.edges.forEach((e) => {
             let st = e.style === 'dashed' ? ', dashed' : e.style === 'dotted' ? ', dotted' : '';
+            
+            // LABEL POSITIONING FOR TIKZ
             let lbl = "";
             if (e.label && e.label !== "") {
-                let pos = e.labelPos === 'sloped' ? 'sloped, above' : e.labelPos;
-                lbl = ` node[fill=white, inner sep=1pt, ${pos}] { $${e.label}$}`;
+                let pos = "";
+                if (e.labelPos === 'above') pos = "above";
+                else if (e.labelPos === 'below') pos = "below";
+                else if (e.labelPos === 'left') pos = "left";
+                else if (e.labelPos === 'right') pos = "right";
+                
+                // "on" does not pass a direction string, which defaults to centering the node directly ON the line.
+                let fillOpts = e.labelPos === 'on' ? "fill=white, inner sep=2pt" : `fill=white, inner sep=2pt, ${pos}`;
+                lbl = ` node[${fillOpts}] { $${e.label}$}`;
             }
 
-            let p1 = window.points.find(p => p.id === e.sourceId); let p2 = window.points.find(p => p.id === e.targetId);
+            let p1 = window.points.find(p => p.id === e.sourceId);
             if (!p1) return;
 
             let arrowCmd = '';
             if (e.arrow === 'end') arrowCmd = '->, '; else if (e.arrow === 'start') arrowCmd = '<-, '; else if (e.arrow === 'both') arrowCmd = '<->, ';
 
             if (e.type === 'line') {
-                if (!p2) return; latex += `    \\draw[${arrowCmd}${e.color}${st}, thick] (n${e.sourceId}) --${lbl} (n${e.targetId});\n`;
+                let p2 = window.points.find(p => p.id === e.targetId); if (!p2) return;
+                latex += `    \\draw[${arrowCmd}${e.color}${st}, thick] (n${e.sourceId}) --${lbl} (n${e.targetId});\n`;
+            } else if (e.type === 'curve') {
+                let p2 = window.points.find(p => p.id === e.targetId); if (!p2) return;
+                let len = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+                let angle = 2 * Math.atan2(e.offset, len / 2) * 180 / Math.PI; 
+                let bend = angle > 0 ? `bend left=${Math.abs(angle).toFixed(1)}` : `bend right=${Math.abs(angle).toFixed(1)}`;
+                latex += `    \\draw[${arrowCmd}${e.color}${st}, thick] (n${e.sourceId}) to[${bend}] ${lbl} (n${e.targetId});\n`;
             } else if (e.type === 'circle') {
-                if (!p2) return; let r = Math.hypot(p2.x - p1.x, p2.y - p1.y).toFixed(2); latex += `    \\draw[${e.color}${st}, thick] (${p1.x},${p1.y}) circle (${r});\n`;
+                latex += `    \\draw[${e.color}${st}, thick] (${p1.x},${p1.y}) circle (${e.radius});\n`;
             } else if (e.type === 'arc') {
                 latex += `    \\draw[${arrowCmd}${e.color}${st}, thick] (${p1.x},${p1.y}) +(${e.startAngle}:${e.radius}) arc [start angle=${e.startAngle}, end angle=${e.endAngle}, radius=${e.radius}];\n`;
             } else if (e.type === 'elliptic-arc') {
-                if (!p2) return; let c = Math.hypot(p2.x - p1.x, p2.y - p1.y) / 2; let a = Math.max(e.radius, c + 0.001); let b = Math.sqrt(a*a - c*c).toFixed(2);
+                let p2 = window.points.find(p => p.id === e.targetId); if (!p2) return;
+                let c = Math.hypot(p2.x - p1.x, p2.y - p1.y) / 2; let a = Math.max(e.radius, c + 0.001); let b = Math.sqrt(a*a - c*c).toFixed(2);
                 let rot = (Math.atan2(p2.y - p1.y, p2.x - p1.x) * 180 / Math.PI).toFixed(2); let cx = ((p1.x + p2.x)/2).toFixed(2); let cy = ((p1.y + p2.y)/2).toFixed(2);
                 latex += `    \\draw[${arrowCmd}${e.color}${st}, thick, rotate around={${rot}:(${cx},${cy})}] (${cx},${cy}) +(${e.startAngle}:${a} and ${b}) arc [start angle=${e.startAngle}, end angle=${e.endAngle}, x radius=${a}, y radius=${b}];\n`;
             }

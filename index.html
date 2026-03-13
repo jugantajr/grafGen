@@ -10,106 +10,106 @@
 </head>
 <body>
     <div id="toolbar">
-        <div class="tool-group">
-            <strong>Tools:</strong>
-            <button id="mode-point" class="active" onclick="setMode('point')" title="Click the canvas to add a coordinate point">Point</button>
-            <button id="mode-line" onclick="setMode('line')" title="Click two points to connect them with a straight line">Line</button>
-            <button id="mode-circle" onclick="setMode('circle')" title="Click a center point, then click a point on the circumference">Circle</button>
-            <button id="mode-arc" onclick="setMode('arc')" title="Click 1 point to set the center of the arc">Circular Arc</button>
-            <button id="mode-elliptic-arc" onclick="setMode('elliptic-arc')" title="Click 2 points to set the foci of the ellipse">Elliptic Arc</button>
-            <button id="mode-text" onclick="setMode('text')" title="Click anywhere to add free-floating text or LaTeX math">Free Text</button>
-            <div class="divider"></div>
-            <button id="mode-select" onclick="setMode('select')" title="Select an item to edit its properties">Select (Arrow)</button>
-            <button id="mode-move" onclick="setMode('move')" title="Click and drag points or text to move them">Move</button>
-            <button id="mode-delete" onclick="setMode('delete')" title="Click any item to erase it">Eraser</button>
-        </div>
-        
-        <div class="tool-group" style="background: #eef2f5; border-radius: 4px; padding: 4px 10px; border: 1px solid #ccd6e0;">
-            <strong style="color: #0056b3;">Macros:</strong>
-            <select id="macro-type" onchange="toggleMacroInputs()" title="Select standard graph shape">
-                <option value="Kn">Complete (Kn)</option>
-                <option value="Cn">Cycle (Cn)</option>
-                <option value="Star">Star (K1,n)</option>
-                <option value="Pn">Path (Pn)</option>
-                <option value="Km,n">Bipartite (Km,n)</option>
-            </select>
-            <input type="number" id="macro-n" value="5" min="1" max="50" style="width: 45px;" title="Nodes (n)">
-            <input type="number" id="macro-m" value="3" min="1" max="50" style="width: 45px; display: none;" title="Left Partition (m)">
-            <button onclick="insertMacro()" style="background: #28a745; color: white; border-color: #218838; font-weight: bold;" title="Instantly draw this graph">Insert</button>
-        </div>
-
-        <div class="tool-group properties-panel">
-            <strong>Properties:</strong>
-            <input type="text" id="prop-label" placeholder="Label..." disabled style="width: 70px;" title="Text Label or Equation">
-            <input type="number" id="prop-label-angle" disabled title="Angle of the point label (0 to 360 degrees)" style="width: 50px; display: none;" placeholder="Ang°">
-            
-            <select id="prop-label-pos" disabled title="Position of the label relative to the line" style="display: none;">
-                <option value="above">Above</option>
-                <option value="below">Below</option>
-                <option value="sloped">Sloped</option>
-            </select>
-            
-            <input type="number" id="prop-radius" disabled title="Radius or Semi-Major Axis" style="width: 55px; display: none;" placeholder="Radius">
-            <input type="number" id="prop-angle-start" disabled title="Starting Angle (Degrees)" style="width: 55px; display: none;" placeholder="Start°">
-            <input type="number" id="prop-angle-end" disabled title="Ending Angle (Degrees)" style="width: 55px; display: none;" placeholder="End°">
-
-            <div class="divider"></div>
-            
-            <select id="prop-arrow" disabled title="Add directional arrows to lines">
-                <option value="none">No Arrow</option>
-                <option value="end">End -></option>
-                <option value="start">Start <-</option>
-                <option value="both">Both <-></option>
-            </select>
-            
-            <div class="custom-select" id="color-picker" title="Change item color">
-                <div class="select-selected" id="current-color">
-                    <span class="color-box" style="background: Black;"></span> Black
-                </div>
-                <div class="select-items select-hide" id="color-list"></div>
+        <div class="toolbar-row">
+            <div class="tool-group">
+                <button onclick="undo()" title="Undo (Ctrl+Z)">↩️</button>
+                <button onclick="redo()" title="Redo (Ctrl+Y)">↪️</button>
+                <button onclick="toggleLayout()" title="Switch layout for mobile devices" style="font-weight: bold; background: #343a40; color: white;">↕️ Layout</button>
+                <button onclick="clearAll()" class="danger" title="Clear entire canvas">Clear All</button>
+                <button onclick="openInstructions()" title="View Instructions" style="font-weight: bold; background: #17a2b8; color: white; border-color: #117a8b; margin-left: 5px;">ℹ️ Help</button>
             </div>
-            
-            <select id="point-style" title="Change point style">
-                <option value="solid">Solid Dot</option>
-                <option value="none">Hollow Dot</option>
-            </select>
-            <select id="line-style" title="Change line style">
-                <option value="solid">Solid Line</option>
-                <option value="dashed">Dashed Line</option>
-                <option value="dotted">Dotted Line</option>
-            </select>
 
-            <button id="prop-delete-btn" class="danger" disabled onclick="deleteSelected()" title="Delete selected item" style="margin-left: 5px;">🗑️</button>
+            <div class="tool-group">
+                <strong>Tools:</strong>
+                <button id="mode-point" class="active" onclick="setMode('point')" title="Click canvas to drop points">Point</button>
+                <button id="mode-line" onclick="setMode('line')" title="Connect two points">Line</button>
+                <button id="mode-curve" onclick="setMode('curve')" title="Click two points to draw a curved line">Curve</button>
+                <button id="mode-circle" onclick="setMode('circle')" title="Click 1 point (center) for circle">Circle</button>
+                <button id="mode-arc" onclick="setMode('arc')" title="Click 1 point for arc">Arc</button>
+                <button id="mode-elliptic-arc" onclick="setMode('elliptic-arc')" title="Click 2 points (foci) for ellipse">Elliptic Arc</button>
+                <button id="mode-text" onclick="setMode('text')" title="Add LaTeX math text">Free Text</button>
+                <div class="divider"></div>
+                <button id="mode-select" onclick="setMode('select')" title="Select items (Shift+Click for multi-select)">Select</button>
+                <button id="mode-move" onclick="setMode('move')" title="Drag items or pan canvas">Move</button>
+                <button id="mode-delete" onclick="setMode('delete')" title="Click item to delete">Eraser</button>
+            </div>
+
+            <div class="tool-group">
+                <button onclick="zoomIn()" title="Zoom in (+)">Zoom +</button>
+                <button onclick="zoomOut()" title="Zoom out (-)">Zoom -</button>
+                <label title="Show/hide grid"><input type="checkbox" id="toggle-grid" checked onchange="draw()"> Grid</label>
+                <label title="Snap to grid intersections"><input type="checkbox" id="snap-grid" checked> Snap</label>
+            </div>
         </div>
 
-        <div class="tool-group">
-            <button onclick="zoomIn()" title="Zoom in (+)">Zoom +</button>
-            <button onclick="zoomOut()" title="Zoom out (-)">Zoom -</button>
-            <label title="Show or hide the background grid"><input type="checkbox" id="toggle-grid" checked onchange="draw()"> Grid</label>
-            <label title="Snap points exactly to grid intersections"><input type="checkbox" id="snap-grid" checked> Snap</label>
-            
-            <div class="divider"></div>
-            <button onclick="toggleLayout()" title="Switch layout for mobile devices" style="font-weight: bold; background: #343a40; color: white;">↕️ Layout</button>
-            
-            <button onclick="clearAll()" class="danger" title="Clear entire canvas" style="margin-left: 5px;">Clear</button>
+        <div class="toolbar-row">
+            <div class="tool-group properties-panel">
+                <strong>Properties:</strong>
+                <span id="properties-placeholder">Select an item to edit</span>
+                
+                <div id="properties-wrapper">
+                    <div class="prop-wrapper" id="wrap-label">Text: <input type="text" id="prop-label" placeholder="..." style="width: 80px;"></div>
+                    <div class="prop-wrapper" id="wrap-angle">Angle: <input type="number" id="prop-label-angle" style="width: 50px;"></div>
+                    <div class="prop-wrapper" id="wrap-pos">Pos: 
+                        <select id="prop-label-pos">
+                            <option value="above">Above</option>
+                            <option value="below">Below</option>
+                            <option value="left">Left</option>
+                            <option value="right">Right</option>
+                            <option value="on">On Line</option>
+                        </select>
+                    </div>
+                    <div class="prop-wrapper" id="wrap-radius"><span id="lbl-radius">Radius:</span> <input type="number" id="prop-radius" style="width: 50px;"></div>
+                    <div class="prop-wrapper" id="wrap-offset">Curve Offset: <input type="number" step="0.5" id="prop-offset" style="width: 50px;" title="Distance from straight line"></div>
+                    <div class="prop-wrapper" id="wrap-start">Start°: <input type="number" id="prop-angle-start" style="width: 50px;"></div>
+                    <div class="prop-wrapper" id="wrap-end">End°: <input type="number" id="prop-angle-end" style="width: 50px;"></div>
+                    <div class="prop-wrapper" id="wrap-arrow">Arrow: 
+                        <select id="prop-arrow"><option value="none">None</option><option value="end">End -></option><option value="start">Start <-</option><option value="both">Both <-></option></select>
+                    </div>
+                    
+                    <div class="prop-wrapper" id="wrap-p-style">Style: <select id="point-style"><option value="solid">Solid</option><option value="none">Hollow</option></select></div>
+                    <div class="prop-wrapper" id="wrap-l-style">Style: <select id="line-style"><option value="solid">Solid</option><option value="dashed">Dashed</option><option value="dotted">Dotted</option></select></div>
+                    
+                    <div class="prop-wrapper" id="wrap-color">
+                        <div class="custom-select" id="color-picker" title="Change color">
+                            <div class="select-selected" id="current-color"><span class="color-box" style="background: Black;"></span> Black</div>
+                            <div class="select-items select-hide" id="color-list"></div>
+                        </div>
+                    </div>
+
+                    <button id="prop-delete-btn" class="danger" onclick="deleteSelected()" title="Delete selected item(s)" style="margin-left: 5px;">🗑️</button>
+                </div>
+            </div>
+
+            <div class="tool-group" style="background: #eef2f5; border-radius: 4px; padding: 4px 10px; border: 1px solid #ccd6e0;">
+                <strong style="color: #0056b3;">Macros:</strong>
+                <select id="macro-type" onchange="toggleMacroInputs()" title="Select shape">
+                    <option value="Kn">Complete (Kn)</option>
+                    <option value="Cn">Cycle (Cn)</option>
+                    <option value="Star">Star (K1,n)</option>
+                    <option value="Pn">Path (Pn)</option>
+                    <option value="Km,n">Bipartite (Km,n)</option>
+                </select>
+                <input type="number" id="macro-n" value="5" min="1" max="50" style="width: 45px;" title="Nodes (n)">
+                <input type="number" id="macro-m" value="3" min="1" max="50" style="width: 45px; display: none;" title="Left Partition (m)">
+                <button onclick="insertMacro()" style="background: #28a745; color: white; border-color: #218838; font-weight: bold;" title="Insert Graph">Insert</button>
+            </div>
         </div>
     </div>
     
     <div id="workspace">
         <div id="left-panel">
             <div id="canvas-container">
-                <canvas id="graphCanvas" title="Graph Drawing Area"></canvas>
+                <canvas id="graphCanvas" tabindex="0" title="Graph Drawing Area"></canvas>
             </div>
         </div>
-        
         <div id="resizer" title="Drag to resize panels"></div>
-        
         <div id="right-panel">
             <div class="output-header">
                 <h3>Generated Code:</h3>
                 <div>
-                    <button onclick="exportJSON()" title="Download graph as JSON to save your work">Save JSON</button>
-                    <button onclick="document.getElementById('file-import').click()" title="Load a previously saved JSON graph">Load JSON</button>
+                    <button onclick="exportJSON()" title="Save graph project">Save JSON</button>
+                    <button onclick="document.getElementById('file-import').click()" title="Load graph project">Load JSON</button>
                     <input type="file" id="file-import" style="display: none;" accept=".json" onchange="importJSON(event)">
                     <select id="code-format" onchange="draw()" title="Choose output LaTeX format">
                         <option value="pstricks">PSTricks</option>
@@ -119,6 +119,39 @@
             </div>
             <textarea id="codeOutput" readonly title="Copy this code into your LaTeX document"></textarea>
             <p style="font-size: 11px; color: #666; margin-top: 5px;">* Select any item and press <b>Delete</b> on your keyboard to remove it.</p>
+        </div>
+    </div>
+
+    <div id="instructions-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeInstructions()">&times;</span>
+            <h2 style="margin-top: 0; color: #0056b3;">Pro Graph Code Builder</h2>
+            <p>A precision mathematics IDE designed specifically for graph theory, matrix analysis, and academic publishing. Visually construct complex graphs and instantly generate publication-ready LaTeX code in both <b>TikZ</b> and <b>PSTricks</b> formats.</p>
+            
+            <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
+            
+            <h3 style="color: #333;">⌨️ Keyboard Shortcuts</h3>
+            <ul style="line-height: 1.6;">
+                <li><b><code>Shift</code> + <code>Click</code></b>: Select multiple items at once to edit or move them together.</li>
+                <li><b><code>Ctrl</code> + <code>A</code></b> (or Cmd+A): Select all elements on the canvas.</li>
+                <li><b><code>Ctrl</code> + <code>Z</code></b> / <b><code>Ctrl</code> + <code>Y</code></b>: Undo and Redo.</li>
+                <li><b><code>Delete</code></b> or <b><code>Backspace</code></b>: Erase selected items.</li>
+            </ul>
+
+            <h3 style="color: #333;">✨ Key Features</h3>
+            <ul style="line-height: 1.6;">
+                <li><b>Live LaTeX Rendering:</b> All text and node labels automatically render standard LaTeX math (e.g., <code>\lambda_{max}</code>) on the canvas.</li>
+                <li><b>Graph Macros:</b> Instantly generate perfectly symmetrical Complete Graphs, Cycles, Paths, Stars, and Bipartite Graphs via the Macros toolbar.</li>
+                <li><b>Precision Snapping:</b> Vertices snap to grid intersections or align automatically with other nodes while dragging.</li>
+                <li><b>Smart Edges:</b> Draw lines, circles, arcs, and bezier curves (perfect for parallel edges and self-loops). Set labels to break the line dynamically using the "On Line" position.</li>
+            </ul>
+
+            <h3 style="color: #333;">🖱️ How to Use</h3>
+            <ol style="line-height: 1.6;">
+                <li><b>Draw:</b> Select a drawing tool (Point, Line, Curve) and click the canvas. The tools are continuous, so you can rapidly build networks.</li>
+                <li><b>Edit:</b> Switch to the `Select` tool (Arrow) and click any item to reveal its specific inputs in the Properties Panel.</li>
+                <li><b>Export:</b> The right panel automatically updates with your LaTeX code. Select TikZ or PSTricks, copy, and paste directly into your document!</li>
+            </ol>
         </div>
     </div>
 

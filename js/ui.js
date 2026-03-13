@@ -102,3 +102,22 @@ window.addEventListener('DOMContentLoaded', setupColorPicker);
 window.getHexFromName = function(name) {
     let match = basicColors.find(c => c.name === name); return match ? match.hex : "#000000";
 };
+
+/* ... (Keep all your existing JS above) ... */
+
+// MODAL CONTROLS
+window.openInstructions = function() {
+    document.getElementById('instructions-modal').style.display = 'flex';
+};
+
+window.closeInstructions = function() {
+    document.getElementById('instructions-modal').style.display = 'none';
+};
+
+// Close the modal if the user clicks anywhere outside of the content box
+window.addEventListener('click', function(event) {
+    let modal = document.getElementById('instructions-modal');
+    if (event.target === modal) {
+        modal.style.display = "none";
+    }
+});
