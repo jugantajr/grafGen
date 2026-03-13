@@ -27,6 +27,10 @@ window.pointIdCounter = 0; window.edgeIdCounter = 0; window.textIdCounter = 0; w
 
 let historyState = []; let historyIndex = -1;
 
+// NEW: Lasso Tracking Variables
+let isLassoing = false;
+let lassoPath = [];
+
 window.saveState = function() {
     if (historyIndex < historyState.length - 1) historyState = historyState.slice(0, historyIndex + 1);
     historyState.push(JSON.stringify({
@@ -58,8 +62,7 @@ let currentMode = 'point';
 window.selectedPointIds = []; window.selectedEdgeIds = []; window.selectedTextIds = []; window.selectedRegionIds = [];
 
 let isDragging = false; let draggedPointId = null; let draggedTextId = null; let draggedRegionId = null; let lastDragMath = null; 
-let isPanning = false; let lastPanX = 0; let lastPanY = 0;
-let isDrawingRegion = false;
+let isPanning = false; let lastPanX = 0; let lastPanY = 0; let isDrawingRegion = false;
 let activeSnapLineX = null; let activeSnapLineY = null;
 
 function getUnitSize() { return baseUnitSize * window.zoom; }
@@ -82,6 +85,78 @@ function screenToMath(sx, sy, ignoreObjectSnap = false) {
 
 function mathToScreen(mx, my) { return { x: originX + (mx * getUnitSize()), y: originY - (my * getUnitSize()) }; }
 
+// Ray-casting algorithm for the Lasso tool
+function isPointInPolygon(point, vs) {
+    let x = point.x, y = point.y; let inside = false;
+    for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
+        let xi = vs[i].x, yi = vs[i].y; let xj = vs[j].x, yj = vs[j].y;
+        let intersect = ((yi > y) != (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+        if (intersect) inside = !inside;
+    }
+    return inside;
+}
+
+window.untangleGraph = function() {
+    if (window.points.length < 2) return;
+    
+    // 🧲 TIGHTER GRAPH SCALING: Reduced ideal edge length (k) and increased gravity
+    let k = 1.5; 
+    let temp = 2.0;
+    let iterations = 0;
+    
+    let cx = 0, cy = 0;
+    window.points.forEach(p => { cx += p.x; cy += p.y; });
+    cx /= window.points.length; cy /= window.points.length;
+
+    function step() {
+        let disp = {};
+        window.points.forEach(p => disp[p.id] = {x: 0, y: 0});
+        
+        // Gravity to center (Stronger to keep it compact)
+        window.points.forEach(p => { disp[p.id].x += (cx - p.x) * 0.2; disp[p.id].y += (cy - p.y) * 0.2; });
+
+        // Node Repulsion
+        for(let i=0; i<window.points.length; i++) {
+            for(let j=i+1; j<window.points.length; j++) {
+                let u = window.points[i], v = window.points[j];
+                let dx = u.x - v.x, dy = u.y - v.y;
+                let dist = Math.hypot(dx, dy) || 0.01;
+                let force = (k * k) / dist;
+                disp[u.id].x += (dx/dist)*force; disp[u.id].y += (dy/dist)*force;
+                disp[v.id].x -= (dx/dist)*force; disp[v.id].y -= (dy/dist)*force;
+            }
+        }
+        
+        // Edge Attraction
+        window.edges.forEach(e => {
+            if(['line', 'curve'].includes(e.type)) {
+                let u = window.points.find(p => p.id === e.sourceId); let v = window.points.find(p => p.id === e.targetId);
+                if(u && v) {
+                    let dx = u.x - v.x, dy = u.y - v.y; let dist = Math.hypot(dx, dy) || 0.01;
+                    let force = (dist * dist) / k;
+                    disp[u.id].x -= (dx/dist)*force; disp[u.id].y -= (dy/dist)*force;
+                    disp[v.id].x += (dx/dist)*force; disp[v.id].y += (dy/dist)*force;
+                }
+            }
+        });
+        
+        // Apply Displacement
+        window.points.forEach(p => {
+            let dx = disp[p.id].x, dy = disp[p.id].y; let dist = Math.hypot(dx, dy) || 0.01;
+            p.x += (dx/dist) * Math.min(dist, temp); p.y += (dy/dist) * Math.min(dist, temp);
+        });
+        
+        temp *= 0.95; 
+        draw();
+        iterations++;
+        
+        if (iterations < 60) { requestAnimationFrame(step); } 
+        else { saveState(); updatePropertyPanel(); }
+    }
+    step(); // Start the animation
+};
+
+
 window.setMode = function(mode, keepSelection = false) {
     currentMode = mode; 
     if (!keepSelection) { window.selectedPointIds = []; window.selectedEdgeIds = []; window.selectedTextIds = []; window.selectedRegionIds = []; }
@@ -89,7 +164,7 @@ window.setMode = function(mode, keepSelection = false) {
     let btn = document.getElementById(`mode-${mode}`); if(btn) btn.classList.add('active');
     
     if (mode === 'move') canvas.style.cursor = 'grab';
-    else if (mode === 'select') canvas.style.cursor = 'pointer';
+    else if (mode === 'select' || mode === 'paint') canvas.style.cursor = 'pointer';
     else if (mode === 'delete') canvas.style.cursor = 'not-allowed';
     else canvas.style.cursor = 'crosshair';
 
@@ -122,7 +197,6 @@ window.deleteSelected = function() {
     if (window.selectedEdgeIds.length > 0) { window.edges = window.edges.filter(e => !window.selectedEdgeIds.includes(e.id)); window.selectedEdgeIds = []; changed = true; }
     if (window.selectedTextIds.length > 0) { window.texts = window.texts.filter(t => !window.selectedTextIds.includes(t.id)); window.selectedTextIds = []; changed = true; }
     if (window.selectedRegionIds.length > 0) { window.regions = window.regions.filter(r => !window.selectedRegionIds.includes(r.id)); window.selectedRegionIds = []; changed = true; }
-    
     if (changed) { saveState(); updatePropertyPanel(); draw(); }
 };
 
@@ -137,13 +211,12 @@ window.clearAll = function() {
 
 window.toggleMacroInputs = function() {
     let type = document.getElementById('macro-type').value;
-    // Show the 'm' input for both Bipartite and Grid graphs
     document.getElementById('macro-m').style.display = (type === 'Km,n' || type === 'Grid') ? 'inline-block' : 'none';
 };
 
 window.insertMacro = function() {
     let type = document.getElementById('macro-type').value;
-    let n = parseInt(document.getElementById('macro-n').value) || 5; let m = parseInt(document.getElementById('macro-m').value) || 3;
+    let n = parseInt(document.getElementById('macro-n').value) || 3; let m = parseInt(document.getElementById('macro-m').value) || 3;
     let r = Math.max(3, n * 0.5); let newPts = []; let startLbl = window.points.length + 1;
     let cx = (canvasWidth / 2 - originX) / getUnitSize(); let cy = (originY - canvasHeight / 2) / getUnitSize();
 
@@ -177,93 +250,131 @@ window.insertMacro = function() {
         for (let i = 0; i < n; i++) { let id = window.pointIdCounter++; setB.push(id); window.points.push({ id, x: cx + rBip, y: startYb - i*2, color: window.activeColor, style: 'solid', label: String(startLbl + m + i), labelAngle: 0 }); }
         for (let a of setA) for (let b of setB) window.edges.push({ id: window.edgeIdCounter++, type: 'line', sourceId: a, targetId: b, color: window.activeColor, style: 'solid', arrow: 'none', label: "", labelPos: 'above' });
     } else if (type === 'Wn') {
-        // Wheel Graph: 1 center, (n-1) cycle
         let centerId = window.pointIdCounter++;
         window.points.push({ id: centerId, x: cx, y: cy, color: window.activeColor, style: 'solid', label: String(startLbl), labelAngle: 90 });
-        let rimNodes = Math.max(3, n - 1); // Enforce at least a triangle on the outside
+        let rimNodes = Math.max(3, n - 1); 
         for (let i = 0; i < rimNodes; i++) {
-            let angle = -Math.PI/2 + (i * 2 * Math.PI) / rimNodes; 
-            let deg = Math.round((-angle * 180 / Math.PI + 360) % 360); 
-            let rimId = window.pointIdCounter++;
-            window.points.push({ id: rimId, x: cx + r * Math.cos(angle), y: cy - r * Math.sin(angle), color: window.activeColor, style: 'solid', label: String(startLbl + 1 + i), labelAngle: deg });
-            newPts.push(rimId);
-            // Spoke edge
+            let angle = -Math.PI/2 + (i * 2 * Math.PI) / rimNodes; let deg = Math.round((-angle * 180 / Math.PI + 360) % 360); let rimId = window.pointIdCounter++;
+            window.points.push({ id: rimId, x: cx + r * Math.cos(angle), y: cy - r * Math.sin(angle), color: window.activeColor, style: 'solid', label: String(startLbl + 1 + i), labelAngle: deg }); newPts.push(rimId);
             window.edges.push({ id: window.edgeIdCounter++, type: 'line', sourceId: centerId, targetId: rimId, color: window.activeColor, style: 'solid', arrow: 'none', label: "", labelPos: 'above' });
         }
-        // Rim edge (cycle)
-        for (let i = 0; i < rimNodes; i++) {
-            window.edges.push({ id: window.edgeIdCounter++, type: 'line', sourceId: newPts[i], targetId: newPts[(i+1)%rimNodes], color: window.activeColor, style: 'solid', arrow: 'none', label: "", labelPos: 'above' });
-        }
-        
+        for (let i = 0; i < rimNodes; i++) { window.edges.push({ id: window.edgeIdCounter++, type: 'line', sourceId: newPts[i], targetId: newPts[(i+1)%rimNodes], color: window.activeColor, style: 'solid', arrow: 'none', label: "", labelPos: 'above' }); }
     } else if (type === 'Grid') {
-        // Grid Graph (m cols x n rows)
-        let gridNodes = [];
-        let startX = cx - ((m-1) * 2) / 2;
-        let startY = cy + ((n-1) * 2) / 2;
-        for (let j = 0; j < n; j++) { // Rows
+        let gridNodes = []; let startX = cx - ((m-1) * 2) / 2; let startY = cy + ((n-1) * 2) / 2;
+        for (let j = 0; j < n; j++) {
             let row = [];
-            for (let i = 0; i < m; i++) { // Cols
+            for (let i = 0; i < m; i++) {
                 let id = window.pointIdCounter++;
-                window.points.push({ id, x: startX + i*2, y: startY - j*2, color: window.activeColor, style: 'solid', label: String(startLbl + j*m + i), labelAngle: 90 });
-                row.push(id);
-                // Connect to left neighbor
+                window.points.push({ id, x: startX + i*2, y: startY - j*2, color: window.activeColor, style: 'solid', label: String(startLbl + j*m + i), labelAngle: 90 }); row.push(id);
                 if (i > 0) window.edges.push({ id: window.edgeIdCounter++, type: 'line', sourceId: row[i-1], targetId: id, color: window.activeColor, style: 'solid', arrow: 'none', label: "", labelPos: 'above' });
-                // Connect to top neighbor
                 if (j > 0) window.edges.push({ id: window.edgeIdCounter++, type: 'line', sourceId: gridNodes[j-1][i], targetId: id, color: window.activeColor, style: 'solid', arrow: 'none', label: "", labelPos: 'above' });
             }
             gridNodes.push(row);
         }
-
     } else if (type === 'Q3') {
-        // 3D Hypercube Projection (Ignores 'n' input, fixed geometry)
-        let offset = 1.5; // Depth projection offset
-        let s = 3; // Cube size
-        let pts = [
-            {x: cx - s/2, y: cy - s/2}, {x: cx + s/2, y: cy - s/2}, // Front bottom
-            {x: cx + s/2, y: cy + s/2}, {x: cx - s/2, y: cy + s/2}, // Front top
-            {x: cx - s/2 + offset, y: cy - s/2 + offset}, {x: cx + s/2 + offset, y: cy - s/2 + offset}, // Back bottom
-            {x: cx + s/2 + offset, y: cy + s/2 + offset}, {x: cx - s/2 + offset, y: cy + s/2 + offset}  // Back top
-        ];
+        let offset = 1.5; let s = 3; 
+        let pts = [ {x: cx - s/2, y: cy - s/2}, {x: cx + s/2, y: cy - s/2}, {x: cx + s/2, y: cy + s/2}, {x: cx - s/2, y: cy + s/2}, {x: cx - s/2 + offset, y: cy - s/2 + offset}, {x: cx + s/2 + offset, y: cy - s/2 + offset}, {x: cx + s/2 + offset, y: cy + s/2 + offset}, {x: cx - s/2 + offset, y: cy + s/2 + offset} ];
         pts.forEach((p, i) => {
-            let id = window.pointIdCounter++;
-            window.points.push({ id, x: p.x, y: p.y, color: window.activeColor, style: 'solid', label: String(startLbl + i), labelAngle: 90 });
-            newPts.push(id);
+            let id = window.pointIdCounter++; window.points.push({ id, x: p.x, y: p.y, color: window.activeColor, style: 'solid', label: String(startLbl + i), labelAngle: 90 }); newPts.push(id);
         });
-        // Edges
-        let edges = [
-            [0,1], [1,2], [2,3], [3,0], // Front face
-            [4,5], [5,6], [6,7], [7,4], // Back face
-            [0,4], [1,5], [2,6], [3,7]  // Connecting depth edges
-        ];
-        edges.forEach(pair => {
-            window.edges.push({ id: window.edgeIdCounter++, type: 'line', sourceId: newPts[pair[0]], targetId: newPts[pair[1]], color: window.activeColor, style: 'solid', arrow: 'none', label: "", labelPos: 'above' });
-        });
+        let edges = [ [0,1], [1,2], [2,3], [3,0], [4,5], [5,6], [6,7], [7,4], [0,4], [1,5], [2,6], [3,7] ];
+        edges.forEach(pair => { window.edges.push({ id: window.edgeIdCounter++, type: 'line', sourceId: newPts[pair[0]], targetId: newPts[pair[1]], color: window.activeColor, style: 'solid', arrow: 'none', label: "", labelPos: 'above' }); });
     }
-
-    saveState(); window.setMode('select');
+    saveState(); window.setMode('select'); 
 };
 
+function updateHUD() {
+    const hud = document.getElementById('graph-hud'); if (!hud) return;
+    
+    let vCount = window.points.length;
+    let eCount = window.edges.filter(e => ['line', 'curve', 'loop'].includes(e.type) && e.sourceId !== undefined && e.targetId !== undefined).length;
+    
+    document.getElementById('hud-v').innerText = vCount;
+    document.getElementById('hud-e').innerText = eCount;
+    
+    const degContainer = document.getElementById('hud-deg-container');
+    if (window.selectedPointIds && window.selectedPointIds.length === 1) {
+        let pId = window.selectedPointIds[0]; let degree = 0;
+        window.edges.forEach(e => {
+            if (['line', 'curve', 'loop'].includes(e.type)) {
+                if (e.sourceId === pId && e.targetId === pId) degree += 2; 
+                else if (e.sourceId === pId || e.targetId === pId) degree += 1;
+            }
+        });
+        document.getElementById('hud-deg').innerText = degree; degContainer.style.display = 'block';
+    } else { degContainer.style.display = 'none'; }
+
+    const specContainer = document.getElementById('hud-spec-container');
+    if (vCount > 0 && typeof numeric !== 'undefined') {
+        let idToIndex = {}; window.points.forEach((p, i) => idToIndex[p.id] = i);
+        let A = Array(vCount).fill(0).map(() => Array(vCount).fill(0));
+        
+        window.edges.forEach(e => {
+            if (e.sourceId !== undefined && e.targetId !== undefined && ['line', 'curve', 'loop'].includes(e.type)) {
+                let u = idToIndex[e.sourceId]; let v = idToIndex[e.targetId];
+                if (u !== undefined && v !== undefined) {
+                    if (e.arrow === 'end' || e.arrow === 'both' || e.arrow === 'none') A[u][v] += 1;
+                    if (e.arrow === 'start' || e.arrow === 'both' || e.arrow === 'none') {
+                        if (u !== v) A[v][u] += 1; 
+                    }
+                }
+            }
+        });
+
+        try {
+            let ev = numeric.eig(A); let eigens = [];
+            for(let i = 0; i < vCount; i++) eigens.push({ re: ev.lambda.x[i], im: ev.lambda.y ? ev.lambda.y[i] : 0 });
+            eigens.sort((a, b) => b.re - a.re); 
+            
+            let formatted = eigens.map(val => {
+                let roundedRe = (Math.abs(val.re) < 1e-10) ? 0 : val.re; 
+                if (Math.abs(val.im) > 1e-6) return roundedRe.toFixed(2) + (val.im > 0 ? '+' : '') + val.im.toFixed(2) + 'i';
+                return roundedRe.toFixed(2);
+            });
+            document.getElementById('hud-spec').innerText = '{ ' + formatted.join(', ') + ' }';
+            specContainer.style.display = 'block';
+        } catch(err) { specContainer.style.display = 'none'; }
+    } else { specContainer.style.display = 'none'; }
+}
+
 function updatePropertyPanel() {
-    const wPanel = document.getElementById('properties-wrapper');
+    const wPanel = document.getElementById('properties-wrapper'); 
     const pPlaceholder = document.getElementById('properties-placeholder');
     const delBtn = document.getElementById('prop-delete-btn');
     
-    ['wrap-label','wrap-angle','wrap-pos','wrap-radius','wrap-offset','wrap-start','wrap-end','wrap-arrow','wrap-p-style','wrap-l-style'].forEach(id => {
-        document.getElementById(id).style.display = 'none';
-    });
+    // Hide all dynamic property wrappers by default
+    ['wrap-label','wrap-angle','wrap-pos','wrap-radius','wrap-offset','wrap-loop-angle','wrap-start','wrap-end','wrap-arrow','wrap-p-style','wrap-l-style'].forEach(id => { document.getElementById(id).style.display = 'none'; });
 
-    // Reset button initially disabled
     if(delBtn) delBtn.disabled = true;
+    pPlaceholder.innerText = "Select an item to edit"; // Default text
 
-    if (window.selectedPointIds.length === 0 && window.selectedEdgeIds.length === 0 && window.selectedTextIds.length === 0 && window.selectedRegionIds.length === 0) {
-        wPanel.style.display = 'none'; pPlaceholder.style.display = 'inline'; return;
+    // 🎨 Paint Mode Helper Text
+    if (currentMode === 'paint') {
+        wPanel.style.display = 'none'; 
+        pPlaceholder.style.display = 'inline';
+        pPlaceholder.innerText = "🖌️ Click items on canvas to paint them";
+        
+        // Ensure color picker reflects the current active drawing color
+        let activeCol = window.activeColor || 'Black';
+        document.getElementById('current-color').innerHTML = `<span class="color-box" style="background: ${window.getHexFromName(activeCol)};"></span> ${activeCol}`;
+        return;
     }
 
+    // If nothing is selected, hide properties and ensure color picker shows the global active color
+    if (window.selectedPointIds.length === 0 && window.selectedEdgeIds.length === 0 && window.selectedTextIds.length === 0 && window.selectedRegionIds.length === 0) {
+        wPanel.style.display = 'none'; 
+        pPlaceholder.style.display = 'inline'; 
+        
+        let activeCol = window.activeColor || 'Black';
+        document.getElementById('current-color').innerHTML = `<span class="color-box" style="background: ${window.getHexFromName(activeCol)};"></span> ${activeCol}`;
+        return;
+    }
+
+    // Show Properties Panel when items are selected
     wPanel.style.display = 'flex'; pPlaceholder.style.display = 'none';
-    
-    // 🔥 BUG FIX: IF ANYTHING IS SELECTED, ENABLE THE TRASH BUTTON 🔥
     if(delBtn) delBtn.disabled = false; 
 
+    // Update properties and color picker based on selected item
     if (window.selectedPointIds.length > 0) {
         let p = window.points.find(p => p.id === window.selectedPointIds[0]); if(!p) return;
         document.getElementById('wrap-label').style.display = 'flex'; document.getElementById('prop-label').value = p.label || "";
@@ -274,12 +385,13 @@ function updatePropertyPanel() {
         let e = window.edges.find(e => e.id === window.selectedEdgeIds[0]); if(!e) return;
         document.getElementById('wrap-label').style.display = 'flex'; document.getElementById('prop-label').value = e.label || "";
         document.getElementById('wrap-pos').style.display = 'flex'; document.getElementById('prop-label-pos').value = e.labelPos || "above";
-        if (['line', 'curve', 'arc', 'elliptic-arc'].includes(e.type)) { document.getElementById('wrap-arrow').style.display = 'flex'; document.getElementById('prop-arrow').value = e.arrow || "none"; }
+        if (['line', 'curve', 'loop', 'arc', 'elliptic-arc'].includes(e.type)) { document.getElementById('wrap-arrow').style.display = 'flex'; document.getElementById('prop-arrow').value = e.arrow || "none"; }
         if (e.type === 'curve') { document.getElementById('wrap-offset').style.display = 'flex'; document.getElementById('prop-offset').value = e.offset; }
-        if (['arc', 'elliptic-arc', 'circle'].includes(e.type)) {
+        if (['arc', 'elliptic-arc', 'circle', 'loop'].includes(e.type)) {
             document.getElementById('wrap-radius').style.display = 'flex'; document.getElementById('prop-radius').value = e.radius;
             if (e.type === 'elliptic-arc') { document.getElementById('lbl-radius').innerText = "Axis(a):"; } else { document.getElementById('lbl-radius').innerText = "Radius:"; }
-            if (e.type !== 'circle') { document.getElementById('wrap-start').style.display = 'flex'; document.getElementById('prop-angle-start').value = e.startAngle; document.getElementById('wrap-end').style.display = 'flex'; document.getElementById('prop-angle-end').value = e.endAngle; }
+            if (e.type === 'loop') { document.getElementById('wrap-loop-angle').style.display = 'flex'; document.getElementById('prop-loop-angle').value = e.loopAngle;
+            } else if (e.type !== 'circle') { document.getElementById('wrap-start').style.display = 'flex'; document.getElementById('prop-angle-start').value = e.startAngle; document.getElementById('wrap-end').style.display = 'flex'; document.getElementById('prop-angle-end').value = e.endAngle; }
         }
         document.getElementById('wrap-l-style').style.display = 'flex'; document.getElementById('line-style').value = e.style;
         document.getElementById('current-color').innerHTML = `<span class="color-box" style="background: ${window.getHexFromName(e.color)};"></span> ${e.color}`;
@@ -293,15 +405,13 @@ function updatePropertyPanel() {
     }
 }
 
-document.getElementById('prop-label').addEventListener('input', (e) => { 
-    if (window.selectedTextIds.length > 0) applyPropertyToSelection('text', e.target.value); 
-    else applyPropertyToSelection('label', e.target.value); 
-});
+document.getElementById('prop-label').addEventListener('input', (e) => { if (window.selectedTextIds.length > 0) applyPropertyToSelection('text', e.target.value); else applyPropertyToSelection('label', e.target.value); });
 document.getElementById('prop-label-angle').addEventListener('input', (e) => applyPropertyToSelection('labelAngle', Number(e.target.value)));
 document.getElementById('prop-label-pos').addEventListener('change', (e) => applyPropertyToSelection('labelPos', e.target.value));
 document.getElementById('prop-arrow').addEventListener('change', (e) => applyPropertyToSelection('arrow', e.target.value));
 document.getElementById('prop-radius').addEventListener('input', (e) => applyPropertyToSelection('radius', Number(e.target.value)));
 document.getElementById('prop-offset').addEventListener('input', (e) => applyPropertyToSelection('offset', Number(e.target.value)));
+document.getElementById('prop-loop-angle').addEventListener('input', (e) => applyPropertyToSelection('loopAngle', Number(e.target.value)));
 document.getElementById('prop-angle-start').addEventListener('input', (e) => applyPropertyToSelection('startAngle', Number(e.target.value)));
 document.getElementById('prop-angle-end').addEventListener('input', (e) => applyPropertyToSelection('endAngle', Number(e.target.value)));
 document.getElementById('point-style').addEventListener('change', (e) => applyPropertyToSelection('style', e.target.value));
@@ -319,11 +429,14 @@ canvas.addEventListener('wheel', (e) => {
 canvas.addEventListener('mousedown', (e) => {
     if (document.getElementById('inline-text-editor')) return;
     canvas.focus(); 
-    const mx = e.clientX - canvas.getBoundingClientRect().left; 
-    const my = e.clientY - canvas.getBoundingClientRect().top;
+    const mx = e.clientX - canvas.getBoundingClientRect().left; const my = e.clientY - canvas.getBoundingClientRect().top;
     
-    let pId = null, tId = null, eId = null, rId = null;
+    // 🪢 NEW: Lasso Mode Initialization
+    if (currentMode === 'lasso') {
+        isLassoing = true; lassoPath = [{x: mx, y: my}]; return;
+    }
 
+    let pId = null, tId = null, eId = null, rId = null;
     let pObj = window.points.find(p => Math.hypot(mathToScreen(p.x, p.y).x - mx, mathToScreen(p.x, p.y).y - my) < 15);
     if (pObj) pId = pObj.id;
 
@@ -340,22 +453,22 @@ canvas.addEventListener('mousedown', (e) => {
                 return distToSegment(mx, my, s1.x, s1.y, s2.x, s2.y) < 15;
             } else if (ed.type === 'curve') {
                 let p2 = window.points.find(p => p.id === ed.targetId); if(!p2) return false; let s2 = mathToScreen(p2.x, p2.y);
-                let d_screen = ed.offset * getUnitSize();
-                let dx = s2.x - s1.x, dy = s2.y - s1.y; let len = Math.hypot(dx, dy);
-                if (len === 0) return false;
-                let nx = dy / len, ny = -dx / len; 
-                let cx = (s1.x + s2.x)/2 + 2 * d_screen * nx; let cy = (s1.y + s2.y)/2 + 2 * d_screen * ny;
+                let d_screen = ed.offset * getUnitSize(); let dx = s2.x - s1.x, dy = s2.y - s1.y; let len = Math.hypot(dx, dy); if (len === 0) return false;
+                let nx = dy / len, ny = -dx / len; let cx = (s1.x + s2.x)/2 + 2 * d_screen * nx; let cy = (s1.y + s2.y)/2 + 2 * d_screen * ny;
                 let minDist = Infinity;
                 for (let t=0; t<=1; t+=0.1) {
                     let bx = (1-t)*(1-t)*s1.x + 2*(1-t)*t*cx + t*t*s2.x; let by = (1-t)*(1-t)*s1.y + 2*(1-t)*t*cy + t*t*s2.y;
                     minDist = Math.min(minDist, Math.hypot(mx - bx, my - by));
                 } return minDist < 15;
+            } else if (ed.type === 'loop') {
+                let r = ed.radius * getUnitSize(); let ang = ed.loopAngle * Math.PI / 180;
+                let cx = s1.x + r * Math.cos(ang); let cy = s1.y - r * Math.sin(ang);
+                return Math.abs(Math.hypot(cx - mx, cy - my) - r) < 15;
             } else if (ed.type === 'circle' || ed.type === 'arc') {
                 let r = ed.radius * getUnitSize(); return Math.abs(Math.hypot(s1.x - mx, s1.y - my) - r) < 15;
             } else if (ed.type === 'elliptic-arc') {
                 let p2 = window.points.find(p => p.id === e.targetId); if(!p2) return false; let s2 = mathToScreen(p2.x, p2.y);
-                let sum = Math.hypot(s1.x - mx, s1.y - my) + Math.hypot(s2.x - mx, s2.y - my);
-                return Math.abs(sum - (2 * ed.radius * getUnitSize())) < 20; 
+                let sum = Math.hypot(s1.x - mx, s1.y - my) + Math.hypot(s2.x - mx, s2.y - my); return Math.abs(sum - (2 * ed.radius * getUnitSize())) < 20; 
             } return false;
         });
         if (eObj) eId = eObj.id;
@@ -363,16 +476,26 @@ canvas.addEventListener('mousedown', (e) => {
 
     if (pId === null && tId === null && eId === null && currentMode !== 'region') {
         for (let i = window.regions.length - 1; i >= 0; i--) {
-            let r = window.regions[i];
-            let sTopL = mathToScreen(r.minX, r.maxY); let sBotR = mathToScreen(r.maxX, r.minY);
+            let r = window.regions[i]; let sTopL = mathToScreen(r.minX, r.maxY); let sBotR = mathToScreen(r.maxX, r.minY);
             if (mx >= sTopL.x && mx <= sBotR.x && my >= sTopL.y && my <= sBotR.y) { rId = r.id; break; }
         }
     }
 
+    // 🎨 NEW: Paint Bucket Logic
+    if (currentMode === 'paint') {
+        let changed = false;
+        if (pId !== null) { let p = window.points.find(x => x.id === pId); if(p) { p.color = window.activeColor; changed = true; } }
+        else if (tId !== null) { let t = window.texts.find(x => x.id === tId); if(t) { t.color = window.activeColor; changed = true; } }
+        else if (eId !== null) { let e = window.edges.find(x => x.id === eId); if(e) { e.color = window.activeColor; changed = true; } }
+        else if (rId !== null) { let r = window.regions.find(x => x.id === rId); if(r) { r.color = window.activeColor; changed = true; } }
+        
+        if (changed) { saveState(); updatePropertyPanel(); draw(); }
+        return;
+    }
+
     if (currentMode === 'delete') {
         if (pId !== null) {
-            window.points = window.points.filter(p => p.id !== pId);
-            window.edges = window.edges.filter(ed => ed.sourceId !== pId && ed.targetId !== pId);
+            window.points = window.points.filter(p => p.id !== pId); window.edges = window.edges.filter(ed => ed.sourceId !== pId && ed.targetId !== pId);
         } else if (tId !== null) { window.texts = window.texts.filter(t => t.id !== tId); }
         else if (eId !== null) { window.edges = window.edges.filter(ed => ed.id !== eId); }
         else if (rId !== null) { window.regions = window.regions.filter(r => r.id !== rId); }
@@ -381,8 +504,7 @@ canvas.addEventListener('mousedown', (e) => {
     }
 
     if (currentMode === 'region') {
-        let m = screenToMath(mx, my);
-        let newId = window.regionIdCounter++;
+        let m = screenToMath(mx, my); let newId = window.regionIdCounter++;
         window.regions.push({ id: newId, minX: m.x, minY: m.y, maxX: m.x, maxY: m.y, color: window.activeColor });
         isDrawingRegion = true; draggedRegionId = newId; return;
     }
@@ -421,15 +543,12 @@ canvas.addEventListener('mousedown', (e) => {
         let input = document.createElement('input'); input.id = 'inline-text-editor'; input.type = 'text'; input.placeholder = "Math/Text...";
         input.style.position = 'absolute'; input.style.left = mx + 'px'; input.style.top = my + 'px';
         input.style.transform = 'translate(-50%, -50%)'; input.style.zIndex = '2000'; input.style.padding = '6px'; input.style.border = '2px solid #007bff'; input.style.borderRadius = '4px';
-        document.getElementById('canvas-container').appendChild(input);
-        setTimeout(() => input.focus(), 50);
-        let isFinished = false;
-        input.onkeydown = (evt) => { if(evt.key === 'Enter') input.blur(); };
+        document.getElementById('canvas-container').appendChild(input); setTimeout(() => input.focus(), 50);
+        let isFinished = false; input.onkeydown = (evt) => { if(evt.key === 'Enter') input.blur(); };
         input.onblur = () => {
             if(isFinished) return; isFinished = true;
             if (input.value) {
-                let newId = window.textIdCounter++;
-                window.texts.push({ id: newId, x: m.x, y: m.y, text: input.value, color: window.activeColor });
+                let newId = window.textIdCounter++; window.texts.push({ id: newId, x: m.x, y: m.y, text: input.value, color: window.activeColor });
                 window.selectedTextIds = [newId]; window.selectedPointIds = []; window.selectedEdgeIds = []; window.selectedRegionIds = []; setMode('select', true); saveState();
             }
             input.remove(); draw();
@@ -443,9 +562,9 @@ canvas.addEventListener('mousedown', (e) => {
             window.selectedPointIds = []; window.selectedEdgeIds = [newId]; window.selectedTextIds = []; window.selectedRegionIds = []; saveState(); if (window.updatePropertyPanel) window.updatePropertyPanel();
         }
     } 
-    else if (currentMode === 'circle' && pId !== null) {
-        let newId = window.edgeIdCounter++;
-        window.edges.push({ id: newId, type: 'circle', sourceId: pId, radius: 1, color: window.activeColor, style: 'solid', label: "", labelPos: 'above' });
+    else if (['circle', 'loop'].includes(currentMode) && pId !== null) {
+        let newId = window.edgeIdCounter++; let eType = currentMode;
+        window.edges.push({ id: newId, type: eType, sourceId: pId, targetId: pId, radius: 1, loopAngle: eType === 'loop' ? 90 : undefined, color: window.activeColor, style: 'solid', label: "", labelPos: 'above', arrow: eType === 'loop' ? 'end' : 'none' });
         window.selectedEdgeIds = [newId]; window.selectedPointIds = []; window.selectedTextIds = []; window.selectedRegionIds = []; saveState(); if (window.updatePropertyPanel) window.updatePropertyPanel();
     }
     else if (currentMode === 'arc' && pId !== null) {
@@ -466,65 +585,67 @@ canvas.addEventListener('mousedown', (e) => {
 });
 
 canvas.addEventListener('mousemove', (e) => {
-    const mx = e.clientX - canvas.getBoundingClientRect().left;
-    const my = e.clientY - canvas.getBoundingClientRect().top;
+    const mx = e.clientX - canvas.getBoundingClientRect().left; const my = e.clientY - canvas.getBoundingClientRect().top;
+    
+    // 🪢 NEW: Lasso Tracing
+    if (isLassoing) { lassoPath.push({x: mx, y: my}); draw(); return; }
     
     if (isPanning) {
         originX += (mx - lastPanX); originY += (my - lastPanY); lastPanX = mx; lastPanY = my; draw();
     } else if (isDrawingRegion && draggedRegionId !== null) {
-        let m = screenToMath(mx, my, true);
-        let r = window.regions.find(reg => reg.id === draggedRegionId);
+        let m = screenToMath(mx, my, true); let r = window.regions.find(reg => reg.id === draggedRegionId);
         if (r) { r.maxX = m.x; r.maxY = m.y; draw(); }
     } else if (isDragging) {
         let currMath = screenToMath(mx, my, false); 
         if (draggedPointId !== null && window.selectedPointIds.length > 0) { 
             let dx = currMath.x - lastDragMath.x; let dy = currMath.y - lastDragMath.y;
-            if (dx !== 0 || dy !== 0) {
-                window.selectedPointIds.forEach(id => { let p = window.points.find(p => p.id === id); if(p) { p.x += dx; p.y += dy; } });
-                lastDragMath = currMath; draw();
-            }
+            if (dx !== 0 || dy !== 0) { window.selectedPointIds.forEach(id => { let p = window.points.find(p => p.id === id); if(p) { p.x += dx; p.y += dy; } }); lastDragMath = currMath; draw(); }
         }
         else if (draggedTextId !== null && window.selectedTextIds.length > 0) { 
             let dx = currMath.x - lastDragMath.x; let dy = currMath.y - lastDragMath.y;
-            if (dx !== 0 || dy !== 0) {
-                window.selectedTextIds.forEach(id => { let t = window.texts.find(t => t.id === id); if(t) { t.x += dx; t.y += dy; } });
-                lastDragMath = currMath; draw();
-            }
+            if (dx !== 0 || dy !== 0) { window.selectedTextIds.forEach(id => { let t = window.texts.find(t => t.id === id); if(t) { t.x += dx; t.y += dy; } }); lastDragMath = currMath; draw(); }
         }
         else if (draggedRegionId !== null && window.selectedRegionIds.length > 0) {
             let dx = currMath.x - lastDragMath.x; let dy = currMath.y - lastDragMath.y;
-            if (dx !== 0 || dy !== 0) {
-                window.selectedRegionIds.forEach(id => { let r = window.regions.find(r => r.id === id); if(r) { r.minX += dx; r.maxX += dx; r.minY += dy; r.maxY += dy; } });
-                lastDragMath = currMath; draw();
-            }
+            if (dx !== 0 || dy !== 0) { window.selectedRegionIds.forEach(id => { let r = window.regions.find(r => r.id === id); if(r) { r.minX += dx; r.maxX += dx; r.minY += dy; r.maxY += dy; } }); lastDragMath = currMath; draw(); }
         }
     }
 });
 
 window.addEventListener('mouseup', () => { 
+    // 🪢 NEW: Lasso Check Enclosed Points -> Auto-Switch to Move Mode
+    if (isLassoing) {
+        isLassoing = false;
+        if (lassoPath.length > 2) {
+            window.selectedPointIds = window.points.filter(p => isPointInPolygon(mathToScreen(p.x, p.y), lassoPath)).map(p => p.id);
+            window.selectedTextIds = window.texts.filter(t => isPointInPolygon(mathToScreen(t.x, t.y), lassoPath)).map(t => t.id);
+            if (window.selectedPointIds.length > 0 || window.selectedTextIds.length > 0) {
+                setMode('move', true); // Instantly switches to Move tool so you can drag the cluster!
+            }
+        }
+        lassoPath = []; draw(); return;
+    }
+
     if (isDragging) saveState(); 
     if (isDrawingRegion && draggedRegionId !== null) {
         let r = window.regions.find(reg => reg.id === draggedRegionId);
         if (r) {
-            let tempX1 = Math.min(r.minX, r.maxX); let tempX2 = Math.max(r.minX, r.maxX);
-            let tempY1 = Math.min(r.minY, r.maxY); let tempY2 = Math.max(r.minY, r.maxY);
+            let tempX1 = Math.min(r.minX, r.maxX); let tempX2 = Math.max(r.minX, r.maxX); let tempY1 = Math.min(r.minY, r.maxY); let tempY2 = Math.max(r.minY, r.maxY);
             r.minX = tempX1; r.maxX = tempX2; r.minY = tempY1; r.maxY = tempY2;
             if (r.maxX - r.minX < 0.2 && r.maxY - r.minY < 0.2) { window.regions = window.regions.filter(reg => reg.id !== r.id); } 
             else { window.selectedRegionIds = [r.id]; setMode('select', true); saveState(); }
         }
     }
     isPanning = false; isDragging = false; isDrawingRegion = false; draggedPointId = null; draggedTextId = null; draggedRegionId = null; activeSnapLineX = null; activeSnapLineY = null; lastDragMath = null;
-    if (currentMode === 'move') canvas.style.cursor = 'grab'; else if (currentMode === 'select') canvas.style.cursor = 'pointer';
+    if (currentMode === 'move') canvas.style.cursor = 'grab'; else if (currentMode === 'select' || currentMode === 'paint') canvas.style.cursor = 'pointer';
     draw(); 
 });
 
 window.addEventListener('keydown', (e) => {
     if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') { 
-        e.preventDefault(); 
-        window.selectedPointIds = window.points.map(p => p.id); window.selectedEdgeIds = window.edges.map(ed => ed.id);
-        window.selectedTextIds = window.texts.map(t => t.id); window.selectedRegionIds = window.regions.map(r => r.id);
-        window.setMode('select', true); return; 
+        e.preventDefault(); window.selectedPointIds = window.points.map(p => p.id); window.selectedEdgeIds = window.edges.map(ed => ed.id);
+        window.selectedTextIds = window.texts.map(t => t.id); window.selectedRegionIds = window.regions.map(r => r.id); window.setMode('select', true); return; 
     }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); window.undo(); return; }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') { e.preventDefault(); window.redo(); return; }
@@ -542,8 +663,10 @@ window.draw = function() {
     let u = getUnitSize();
     document.querySelectorAll('.math-overlay').forEach(el => el.remove());
 
+    let isDark = document.body.classList.contains('dark-mode');
+
     if (document.getElementById('toggle-grid').checked) {
-        ctx.strokeStyle = '#e0e0e0'; ctx.lineWidth = 1;
+        ctx.strokeStyle = isDark ? '#b0b0b0' : '#e0e0e0'; ctx.lineWidth = 1;
         let sX = originX % u; if (sX < 0) sX += u;
         for (let i = sX; i <= canvasWidth; i += u) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvasHeight); ctx.stroke(); }
         let sY = originY % u; if (sY < 0) sY += u;
@@ -551,29 +674,22 @@ window.draw = function() {
     }
 
     if (activeSnapLineX !== null || activeSnapLineY !== null) {
-        ctx.setLineDash([5, 5]); ctx.strokeStyle = 'rgba(0, 123, 255, 0.4)';
+        ctx.setLineDash([5, 5]); ctx.strokeStyle = isDark ? 'rgba(255, 150, 0, 0.6)' : 'rgba(0, 123, 255, 0.4)';
         if (activeSnapLineX !== null) { let sx = originX + activeSnapLineX * u; ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx, canvasHeight); ctx.stroke(); }
         if (activeSnapLineY !== null) { let sy = originY - activeSnapLineY * u; ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(canvasWidth, sy); ctx.stroke(); }
         ctx.setLineDash([]);
     }
 
-    ctx.strokeStyle = '#ccc'; ctx.lineWidth = 2;
+    ctx.strokeStyle = isDark ? '#808080' : '#ccc'; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(originX, 0); ctx.lineTo(originX, canvasHeight); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(0, originY); ctx.lineTo(canvasWidth, originY); ctx.stroke();
 
     window.regions.forEach(r => {
         let s1 = mathToScreen(r.minX, r.maxY); let s2 = mathToScreen(r.maxX, r.minY);
         let w = s2.x - s1.x; let h = s2.y - s1.y;
-        
         ctx.fillStyle = window.getHexFromName(r.color) + '33'; 
-        ctx.beginPath(); 
-        if (ctx.roundRect) ctx.roundRect(s1.x, s1.y, w, h, 25); 
-        else ctx.rect(s1.x, s1.y, w, h); 
-        ctx.fill();
-
-        if (window.selectedRegionIds.includes(r.id)) {
-            ctx.strokeStyle = 'gold'; ctx.lineWidth = 3; ctx.setLineDash([8,8]); ctx.stroke(); ctx.setLineDash([]);
-        }
+        ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(s1.x, s1.y, w, h, 25); else ctx.rect(s1.x, s1.y, w, h); ctx.fill();
+        if (window.selectedRegionIds.includes(r.id)) { ctx.strokeStyle = 'gold'; ctx.lineWidth = 3; ctx.setLineDash([8,8]); ctx.stroke(); ctx.setLineDash([]); }
     });
 
     window.edges.forEach(e => {
@@ -601,6 +717,13 @@ window.draw = function() {
                 if (['end','both'].includes(e.arrow)) { let ang = Math.atan2(s2.y-cy, s2.x-cx); drawArrowhead(ctx, s2.x-5*Math.cos(ang), s2.y-5*Math.sin(ang), ang, ctx.strokeStyle); }
                 if (['start','both'].includes(e.arrow)) { let ang = Math.atan2(s1.y-cy, s1.x-cx); drawArrowhead(ctx, s1.x+5*Math.cos(ang), s1.y+5*Math.sin(ang), ang+Math.PI, ctx.strokeStyle); }
             }
+        } else if (e.type === 'loop') {
+            let r = e.radius * u; let ang = e.loopAngle * Math.PI / 180;
+            let cx = s1.x + r * Math.cos(ang); let cy = s1.y - r * Math.sin(ang);
+            ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.stroke();
+            midX = cx + r * Math.cos(ang); midY = cy - r * Math.sin(ang);
+            if (['end','both'].includes(e.arrow)) { drawArrowhead(ctx, midX, midY, -ang + Math.PI/2, ctx.strokeStyle); }
+            if (['start','both'].includes(e.arrow)) { drawArrowhead(ctx, midX, midY, -ang - Math.PI/2, ctx.strokeStyle); }
         } else if (e.type === 'circle') {
             let r = e.radius * u; ctx.arc(s1.x, s1.y, r, 0, Math.PI*2); ctx.stroke(); midY -= r;
         } else if (e.type === 'arc') {
@@ -656,27 +779,31 @@ window.draw = function() {
         }
     });
 
+    // 🪢 NEW: Render Lasso Path
+    if (isLassoing && lassoPath.length > 0) {
+        ctx.save(); ctx.beginPath(); ctx.moveTo(lassoPath[0].x, lassoPath[0].y);
+        for(let i=1; i<lassoPath.length; i++) { ctx.lineTo(lassoPath[i].x, lassoPath[i].y); }
+        ctx.closePath();
+        ctx.fillStyle = isDark ? 'rgba(138, 180, 248, 0.2)' : 'rgba(0, 123, 255, 0.1)'; ctx.fill();
+        ctx.strokeStyle = isDark ? '#8ab4f8' : '#007bff'; ctx.setLineDash([5, 5]); ctx.lineWidth = 1; ctx.stroke();
+        ctx.restore();
+    }
+
     if (window.generateCode) window.generateCode();
+    updateHUD();
 };
 
 window.exportImage = async function() {
-    let oldGrid = document.getElementById('toggle-grid').checked;
-    document.getElementById('toggle-grid').checked = false;
-    let oldPoints = window.selectedPointIds; let oldEdges = window.selectedEdgeIds;
-    let oldTexts = window.selectedTextIds; let oldRegions = window.selectedRegionIds;
+    let oldGrid = document.getElementById('toggle-grid').checked; document.getElementById('toggle-grid').checked = false;
+    let oldPoints = window.selectedPointIds; let oldEdges = window.selectedEdgeIds; let oldTexts = window.selectedTextIds; let oldRegions = window.selectedRegionIds;
     window.selectedPointIds = []; window.selectedEdgeIds = []; window.selectedTextIds = []; window.selectedRegionIds = [];
     draw(); 
-
     const container = document.getElementById('canvas-container');
     const canvasImg = await html2canvas(container, { backgroundColor: null, scale: 2 });
-
     document.getElementById('toggle-grid').checked = oldGrid;
-    window.selectedPointIds = oldPoints; window.selectedEdgeIds = oldEdges; 
-    window.selectedTextIds = oldTexts; window.selectedRegionIds = oldRegions;
+    window.selectedPointIds = oldPoints; window.selectedEdgeIds = oldEdges; window.selectedTextIds = oldTexts; window.selectedRegionIds = oldRegions;
     draw();
-
-    const link = document.createElement('a'); link.download = 'graph_export.png';
-    link.href = canvasImg.toDataURL('image/png'); link.click();
+    const link = document.createElement('a'); link.download = 'graph_export.png'; link.href = canvasImg.toDataURL('image/png'); link.click();
 };
 
 window.exportJSON = function() {
@@ -688,10 +815,8 @@ window.importJSON = function(e) {
     reader.onload = function(ev) {
         let obj = JSON.parse(ev.target.result); window.points = obj.points || []; window.edges = obj.edges || []; window.texts = obj.texts || []; window.regions = obj.regions || [];
         if (obj.originX !== undefined) originX = obj.originX; if (obj.originY !== undefined) originY = obj.originY; if (obj.zoom !== undefined) window.zoom = obj.zoom;
-        window.pointIdCounter = window.points.length ? Math.max(...window.points.map(p=>p.id))+1 : 0; 
-        window.edgeIdCounter = window.edges.length ? Math.max(...window.edges.map(e=>e.id))+1 : 0; 
-        window.textIdCounter = window.texts.length ? Math.max(...window.texts.map(t=>t.id))+1 : 0;
-        window.regionIdCounter = window.regions.length ? Math.max(...window.regions.map(r=>r.id))+1 : 0;
+        window.pointIdCounter = window.points.length ? Math.max(...window.points.map(p=>p.id))+1 : 0; window.edgeIdCounter = window.edges.length ? Math.max(...window.edges.map(e=>e.id))+1 : 0; 
+        window.textIdCounter = window.texts.length ? Math.max(...window.texts.map(t=>t.id))+1 : 0; window.regionIdCounter = window.regions.length ? Math.max(...window.regions.map(r=>r.id))+1 : 0;
         saveState(); draw();
     }; reader.readAsText(e.target.files[0]);
 }

@@ -23,10 +23,15 @@ function getBounds() {
         } else if (e.type === 'curve') {
             let p2 = window.points.find(p => p.id === e.targetId);
             if (p2) {
-                let r = Math.abs(e.offset); // Rough bounds expansion for curves
+                let r = Math.abs(e.offset); 
                 if(p1.x - r < minX) minX = Math.floor(p1.x - r); if(p1.x + r > maxX) maxX = Math.ceil(p1.x + r);
                 if(p1.y - r < minY) minY = Math.floor(p1.y - r); if(p1.y + r > maxY) maxY = Math.ceil(p1.y + r);
             }
+        } else if (e.type === 'loop') {
+            let r = e.radius; let ang = e.loopAngle * Math.PI / 180;
+            let cx = p1.x + r * Math.cos(ang); let cy = p1.y + r * Math.sin(ang);
+            if(cx - r < minX) minX = Math.floor(cx - r); if(cx + r > maxX) maxX = Math.ceil(cx + r);
+            if(cy - r < minY) minY = Math.floor(cy - r); if(cy + r > maxY) maxY = Math.ceil(cy + r);
         } else if (e.type === 'elliptic-arc') {
             let p2 = window.points.find(p => p.id === e.targetId);
             if (p2) {
@@ -44,6 +49,17 @@ window.generateCode = function() {
     const out = document.getElementById('codeOutput');
     if (window.points.length === 0 && window.texts.length === 0 && window.regions.length === 0) { out.value = "% Add points to generate code!"; return; }
     
+    if (format === 'matrix') { 
+        out.value = window.generateMatricesLaTeX(); 
+        return; 
+    }
+
+    // NEW: Python Intercept
+    if (format === 'python') {
+        out.value = window.generatePythonNetworkX();
+        return;
+    }
+    
     let b = getBounds(); let latex = "";
     
     if (format === 'pstricks') {
@@ -51,12 +67,9 @@ window.generateCode = function() {
         latex += `\\begin{pspicture}(${b.minX},${b.minY})(${b.maxX},${b.maxY})\n`;
         latex += `    \\def\\r{2pt}\n    \\psgrid[subgriddiv=1,griddots=10,gridlabels=7pt](${b.minX},${b.minY})(${b.maxX},${b.maxY})\n\n`;
 
-        // Render Regions first so they sit in the background
         if (window.regions && window.regions.length > 0) {
             latex += `    % Clusters / Regions\n`;
-            window.regions.forEach(r => {
-                latex += `    \\psframe[linestyle=none, fillstyle=solid, fillcolor=${r.color}, opacity=0.15, framearc=0.3](${r.minX},${r.minY})(${r.maxX},${r.maxY})\n`;
-            });
+            window.regions.forEach(r => { latex += `    \\psframe[linestyle=none, fillstyle=solid, fillcolor=${r.color}, opacity=0.15, framearc=0.3](${r.minX},${r.minY})(${r.maxX},${r.maxY})\n`; });
             latex += `\n`;
         }
 
@@ -70,8 +83,7 @@ window.generateCode = function() {
         
         window.edges.forEach((e) => {
             let st = `linecolor=${e.color}`;
-            if (e.style === 'dashed') st += ", linestyle=dashed";
-            if (e.style === 'dotted') st += ", linestyle=dotted";
+            if (e.style === 'dashed') st += ", linestyle=dashed"; if (e.style === 'dotted') st += ", linestyle=dotted";
             
             let lbl = "";
             if (e.label && e.label !== "") {
@@ -84,7 +96,6 @@ window.generateCode = function() {
             }
 
             let p1 = window.points.find(p => p.id === e.sourceId); if (!p1) return;
-
             let arrowCmd = '';
             if (e.arrow === 'end') arrowCmd = '{->}'; else if (e.arrow === 'start') arrowCmd = '{<-}'; else if (e.arrow === 'both') arrowCmd = '{<->}';
 
@@ -93,9 +104,11 @@ window.generateCode = function() {
                 latex += `    \\ncline[${st}]${arrowCmd}{n${e.sourceId}}{n${e.targetId}}${lbl}\n`;
             } else if (e.type === 'curve') {
                 let p2 = window.points.find(p => p.id === e.targetId); if (!p2) return;
-                let len = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-                let angle = 2 * Math.atan2(e.offset, len / 2) * 180 / Math.PI; 
+                let len = Math.hypot(p2.x - p1.x, p2.y - p1.y); let angle = 2 * Math.atan2(e.offset, len / 2) * 180 / Math.PI; 
                 latex += `    \\ncarc[${st}, arcangle=${angle.toFixed(1)}]${arrowCmd}{n${e.sourceId}}{n${e.targetId}}${lbl}\n`;
+            } else if (e.type === 'loop') {
+                let outAng = e.loopAngle + 30; let inAng = e.loopAngle - 30;
+                latex += `    \\ncloop[${st}, loopsize=${e.radius}, angleA=${inAng}, angleB=${outAng}]${arrowCmd}{n${e.sourceId}}{n${e.sourceId}}${lbl}\n`;
             } else if (e.type === 'circle') {
                 latex += `    \\pscircle[${st}](${p1.x},${p1.y}){${e.radius}}\n`;
             } else if (e.type === 'arc') {
@@ -103,8 +116,7 @@ window.generateCode = function() {
             } else if (e.type === 'elliptic-arc') {
                 let p2 = window.points.find(p => p.id === e.targetId); if (!p2) return;
                 let c = Math.hypot(p2.x - p1.x, p2.y - p1.y) / 2; let a = Math.max(e.radius, c + 0.001); let b = Math.sqrt(a*a - c*c).toFixed(2);
-                let rot = (Math.atan2(p2.y - p1.y, p2.x - p1.x) * 180 / Math.PI).toFixed(2);
-                let cx = ((p1.x + p2.x)/2).toFixed(2); let cy = ((p1.y + p2.y)/2).toFixed(2);
+                let rot = (Math.atan2(p2.y - p1.y, p2.x - p1.x) * 180 / Math.PI).toFixed(2); let cx = ((p1.x + p2.x)/2).toFixed(2); let cy = ((p1.y + p2.y)/2).toFixed(2);
                 latex += `    \\rput{${rot}}(${cx},${cy}){\\psellipticarc[${st}]${arrowCmd}(0,0)(${a},${b}){${e.startAngle}}{${e.endAngle}}}\n`;
             }
         });
@@ -119,9 +131,7 @@ window.generateCode = function() {
         
         if (window.regions && window.regions.length > 0) {
             latex += `    % Clusters / Regions\n`;
-            window.regions.forEach(r => {
-                latex += `    \\draw [draw=none, fill=${r.color}, fill opacity=0.15, rounded corners=15pt] (${r.minX},${r.minY}) rectangle (${r.maxX},${r.maxY});\n`;
-            });
+            window.regions.forEach(r => { latex += `    \\draw [draw=none, fill=${r.color}, fill opacity=0.15, rounded corners=15pt] (${r.minX},${r.minY}) rectangle (${r.maxX},${r.maxY});\n`; });
             latex += `\n`;
         }
 
@@ -134,21 +144,15 @@ window.generateCode = function() {
         
         window.edges.forEach((e) => {
             let st = e.style === 'dashed' ? ', dashed' : e.style === 'dotted' ? ', dotted' : '';
-            
             let lbl = "";
             if (e.label && e.label !== "") {
                 let pos = "";
-                if (e.labelPos === 'above') pos = "above";
-                else if (e.labelPos === 'below') pos = "below";
-                else if (e.labelPos === 'left') pos = "left";
-                else if (e.labelPos === 'right') pos = "right";
-                
+                if (e.labelPos === 'above') pos = "above"; else if (e.labelPos === 'below') pos = "below"; else if (e.labelPos === 'left') pos = "left"; else if (e.labelPos === 'right') pos = "right";
                 let fillOpts = e.labelPos === 'on' ? "fill=white, inner sep=2pt" : `fill=white, inner sep=2pt, ${pos}`;
                 lbl = ` node[${fillOpts}] { $${e.label}$}`;
             }
 
             let p1 = window.points.find(p => p.id === e.sourceId); if (!p1) return;
-
             let arrowCmd = '';
             if (e.arrow === 'end') arrowCmd = '->, '; else if (e.arrow === 'start') arrowCmd = '<-, '; else if (e.arrow === 'both') arrowCmd = '<->, ';
 
@@ -157,10 +161,12 @@ window.generateCode = function() {
                 latex += `    \\draw[${arrowCmd}${e.color}${st}, thick] (n${e.sourceId}) --${lbl} (n${e.targetId});\n`;
             } else if (e.type === 'curve') {
                 let p2 = window.points.find(p => p.id === e.targetId); if (!p2) return;
-                let len = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-                let angle = 2 * Math.atan2(e.offset, len / 2) * 180 / Math.PI; 
+                let len = Math.hypot(p2.x - p1.x, p2.y - p1.y); let angle = 2 * Math.atan2(e.offset, len / 2) * 180 / Math.PI; 
                 let bend = angle > 0 ? `bend left=${Math.abs(angle).toFixed(1)}` : `bend right=${Math.abs(angle).toFixed(1)}`;
                 latex += `    \\draw[${arrowCmd}${e.color}${st}, thick] (n${e.sourceId}) to[${bend}] ${lbl} (n${e.targetId});\n`;
+            } else if (e.type === 'loop') {
+                let outAng = e.loopAngle + 30; let inAng = e.loopAngle - 30;
+                latex += `    \\draw[${arrowCmd}${e.color}${st}, thick] (n${e.sourceId}) to[out=${outAng}, in=${inAng}, loop, distance=${e.radius*3}cm] ${lbl} (n${e.sourceId});\n`;
             } else if (e.type === 'circle') {
                 latex += `    \\draw[${e.color}${st}, thick] (${p1.x},${p1.y}) circle (${e.radius});\n`;
             } else if (e.type === 'arc') {

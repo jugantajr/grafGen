@@ -103,21 +103,57 @@ window.getHexFromName = function(name) {
     let match = basicColors.find(c => c.name === name); return match ? match.hex : "#000000";
 };
 
-/* ... (Keep all your existing JS above) ... */
-
-// MODAL CONTROLS
 window.openInstructions = function() {
     document.getElementById('instructions-modal').style.display = 'flex';
 };
-
 window.closeInstructions = function() {
     document.getElementById('instructions-modal').style.display = 'none';
 };
 
-// Close the modal if the user clicks anywhere outside of the content box
+window.openAbout = function() {
+    document.getElementById('about-modal').style.display = 'flex';
+};
+window.closeAbout = function() {
+    document.getElementById('about-modal').style.display = 'none';
+};
+
+// Close modals if the user clicks anywhere outside of the content boxes
 window.addEventListener('click', function(event) {
-    let modal = document.getElementById('instructions-modal');
-    if (event.target === modal) {
-        modal.style.display = "none";
+    let helpModal = document.getElementById('instructions-modal');
+    let aboutModal = document.getElementById('about-modal');
+    
+    if (event.target === helpModal) {
+        helpModal.style.display = "none";
+    }
+    if (event.target === aboutModal) {
+        aboutModal.style.display = "none";
+    }
+});
+
+// ==========================================
+// THEME TOGGLE (Light / Dark Mode)
+// ==========================================
+window.toggleTheme = function() {
+    document.body.classList.toggle('dark-mode');
+    let isDark = document.body.classList.contains('dark-mode');
+    
+    // Save preference to browser storage
+    localStorage.setItem('prograph_theme', isDark ? 'dark' : 'light');
+    
+    // Swap the icon
+    let icon = document.querySelector('#theme-btn .material-symbols-outlined');
+    if (icon) {
+        icon.innerText = isDark ? 'light_mode' : 'dark_mode';
+    }
+
+    if (typeof draw === 'function') draw();
+};
+
+// Check for saved theme on load
+window.addEventListener('DOMContentLoaded', () => {
+    if (localStorage.getItem('prograph_theme') === 'dark') {
+        document.body.classList.add('dark-mode');
+        let icon = document.querySelector('#theme-btn .material-symbols-outlined');
+        if (icon) icon.innerText = 'light_mode';
     }
 });

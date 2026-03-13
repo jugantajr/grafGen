@@ -108,3 +108,107 @@ button.icon-btn {
 button.icon-btn .material-symbols-outlined {
     font-size: 18px; /* Control the exact size of the icons here */
 }
+
+/* GRAPH INVARIANTS HUD */
+#graph-hud {
+    position: absolute;
+    bottom: 15px;
+    right: 15px;
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(4px);
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    padding: 10px 15px;
+    font-family: monospace;
+    font-size: 14px;
+    color: #333;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    pointer-events: none; /* Let clicks pass right through to the canvas! */
+    z-index: 100;
+    line-height: 1.6;
+}
+
+#graph-hud strong {
+    color: #0056b3;
+    font-size: 15px;
+}
+
+body.dark-mode {
+    background-color: #121212;
+    color: #e0e0e0;
+}
+
+body.dark-mode #toolbar, 
+body.dark-mode #left-panel, 
+body.dark-mode #right-panel, 
+body.dark-mode .modal-content {
+    background-color: #1e1e1e;
+    border-color: #333;
+    color: #e0e0e0;
+}
+
+body.dark-mode .output-header {
+    background-color: #2a2a2a;
+    border-bottom-color: #333;
+}
+
+body.dark-mode button {
+    background-color: #2d2d2d;
+    color: #e0e0e0;
+    border-color: #444;
+}
+
+body.dark-mode button:hover {
+    background-color: #3d3d3d;
+}
+
+body.dark-mode button.active {
+    background-color: #0d6efd;
+    color: #fff;
+    border-color: #0b5ed7;
+}
+
+body.dark-mode input, 
+body.dark-mode select, 
+body.dark-mode textarea {
+    background-color: #121212;
+    color: #e0e0e0;
+    border-color: #444;
+}
+
+body.dark-mode .tool-group[style*="background: #eef2f5"] {
+    background: #2a2a2a !important;
+    border-color: #444 !important;
+}
+
+body.dark-mode .tool-group strong[style*="color: #0056b3"] {
+    color: #8ab4f8 !important;
+}
+
+body.dark-mode h2, body.dark-mode h3 {
+    color: #8ab4f8 !important;
+}
+
+body.dark-mode hr {
+    border-top-color: #444 !important;
+}
+
+body.dark-mode #graph-hud {
+    background: rgba(30, 30, 30, 0.85);
+    color: #e0e0e0;
+    border-color: #444;
+}
+
+body.dark-mode #graph-hud strong {
+    color: #8ab4f8;
+}
+
+/* SMART CANVAS INVERSION */
+/* Inverts black to white, but preserves hues (blue stays blue, red stays red) */
+body.dark-mode #graphCanvas {
+    filter: invert(0.9) hue-rotate(180deg);
+}
+
+body.dark-mode .math-overlay {
+    filter: invert(0.9) hue-rotate(180deg);
+}
