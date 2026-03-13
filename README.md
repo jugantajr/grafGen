@@ -1,27 +1,88 @@
-# Pro Graph Code Builder
+# 📈 grafGen
 
-A precision mathematics IDE and drawing tool designed specifically for graph theory, matrix analysis, and academic publishing. This tool allows you to visually construct complex graphs and instantly generate publication-ready LaTeX code in both **TikZ** and **PSTricks** formats.
+**A precision mathematics IDE designed specifically for graph theory, matrix analysis, and academic publishing.**
 
-## Key Features
+grafGen bridges the gap between a tactile drawing application and a heavy computational sandbox. It allows you to visually construct complex graphs and instantly generate publication-ready LaTeX code, Adjacency/Laplacian matrices, and Python scripts.
 
-* **Live LaTeX Rendering:** Powered by KaTeX, all text and node labels render standard LaTeX math (e.g., $\lambda_{max}$, $x^2$) directly on the canvas.
-* **Graph Macros:** Instantly generate perfectly symmetrical standard graphs with one click, including Complete Graphs ($K_n$), Cycles ($C_n$), Paths ($P_n$), Stars, and Bipartite Graphs ($K_{m,n}$).
-* **Precision Snapping:** Align vertices perfectly using dynamic X/Y axis guide lines and grid snapping.
-* **Advanced Geometric Edges:** Draw straight lines, circles, standard arcs, elliptic arcs, and quadratic bezier curves (perfect for parallel edges or self-loops).
-* **Smart Label Positioning:** Place edge labels Above, Below, Left, Right, or directly "On Line" (which automatically breaks the line with a white background, standard for LaTeX figures).
+## ✨ Key Features
+* **Real-time LaTeX Generation:** Output perfectly formatted `TikZ` and `PSTricks` code.
+* **Live Mathematical HUD:** Instantly calculates Order $|V|$, Size $|E|$, Degree $d(v)$, and the Eigenvalue Spectrum $Spec(A)$.
+* **Algorithmic Graph Theory:** Features built-in force-directed physics, greedy coloring algorithms, and BFS bipartite checking.
+* **Smart Exporting:** Download transparent, print-ready PNGs (even while working in Dark Mode) or export to Python's `NetworkX`.
 
-## Keyboard Shortcuts
+---
 
-* **`Shift` + `Click`**: Select multiple items (points, edges, texts) at once.
-* **`Ctrl` + `A`** (or **`Cmd` + `A`**): Select all elements on the canvas.
-* **`Ctrl` + `Z`**: Undo.
-* **`Ctrl` + `Y`**: Redo.
-* **`Delete`** or **`Backspace`**: Erase selected items.
+## 🛠️ Drawing Tools
 
-## How to Use
+Create and annotate your topological structures with precision tools.
 
-1.  **Drawing Points & Lines:** Select the `Point` tool to drop vertices. Select `Line` (or `Curve`) and click two points to connect them. The tools are *continuous*—you can keep clicking to draw rapidly!
-2.  **Editing Properties:** Switch to the `Select` tool (Arrow) and click any item. The Properties Panel will reveal specific inputs for that shape (Radius, Curve Offset, Start/End Angles, Colors, Line Styles).
-3.  **Moving Elements:** Use the `Move` tool to drag individual nodes or grouped selections. Dragging an empty space on the canvas will pan your view.
-4.  **Exporting Code:** As you draw, the right panel automatically updates. Select your preferred LaTeX package (`TikZ` or `PSTricks`) from the dropdown, copy the code, and paste it directly into your `.tex` document.
-5.  **Saving Work:** Click `Save JSON` to download your graph's data state. You can reload this file later using `Load JSON` to continue editing.
+* 🔘 **Point:** Click the canvas to drop nodes.
+* 📏 **Line:** Click two points to connect them sequentially.
+* 〰️ **Curve:** Connect two points to draw a Bezier curve (adjustable offset).
+* ♾️ **Loop:** Click a single point to draw a self-loop (adjustable angle and radius).
+* ⭕ **Circle:** Click one point to create a boundary circle.
+* 🌘 **Arc / Elliptic Arc:** Click to create open arcs or set foci for ellipses.
+* 🔲 **Region:** Drag a box to draw a shaded, curved cluster background.
+* 🔠 **Free Text:** Click anywhere to add free-floating LaTeX math text.
+
+---
+
+## 🖱️ Interactive Tools
+
+Fluidly manipulate your workspace.
+
+* 🖱️ **Select:** Click items to edit their properties. **Hold Shift** for multi-select.
+* ➰ **Lasso:** Draw a freehand loop around items to select an entire subgraph at once.
+* 🪣 **Paint Bucket:** Select a color from the toolbar and click items to instantly dye them.
+* ✋ **Move:** Drag selected items, or click and drag empty space to pan the canvas.
+* 🧽 **Eraser:** Click any item to instantly delete it (or select and press the `Delete` key).
+
+---
+
+## 🧠 Algorithmic & Physics Tools
+
+Watch your graph think for itself.
+
+* 🪄 **Magic Untangle (Auto-Layout):** Uses a force-directed spring physics algorithm to physically repel nodes and untangle messy, crossing edges into a symmetric layout.
+* 🎨 **Auto-Color (Greedy Coloring):** Instantly estimates the chromatic number and dyes the graph using the minimum necessary colors, ensuring no adjacent nodes share the same color.
+* 🔀 **Bipartite Snapper:** Runs a Breadth-First Search (BFS) to test if the graph is bipartite. If yes, it snaps nodes into two distinct, colored sets. If no, it traces and highlights the odd-length cycle in red.
+
+---
+
+## 🏗️ Macros & Generation
+
+Stop drawing standard graphs by hand. Instantly generate common structures:
+* **Complete ($K_n$) & Cycle ($C_n$)**
+* **Path ($P_n$) & Star ($K_{1,n}$)**
+* **Bipartite ($K_{m,n}$)**
+* **Wheel ($W_n$)**
+* **Lattice Grid ($m \times n$)**
+* **3D Hypercube ($Q_3$)**
+
+---
+
+## 💾 Output & Export Options
+
+Access the generated code from the right-hand panel.
+
+1. **TikZ:** Native LaTeX formatting.
+2. **PSTricks:** Node-based LaTeX formatting.
+3. **Matrices:** Automatically maps your visual nodes to strictly formatted Adjacency ($A$), Degree ($D$), and Laplacian ($L$) `\bmatrix` environments.
+4. **Python (NetworkX):** Outputs a ready-to-run Python script that recreates your exact graph and its visual `(x, y)` coordinate layout.
+5. **Image:** Export a high-resolution, transparent PNG.
+6. **Save/Load JSON:** Save your active workspace locally and pick up right where you left off.
+
+---
+
+## 🚀 Getting Started
+
+grafGen is a purely client-side web application. No server, database, or installation is required.
+1. Clone or download this repository.
+2. Open `index.html` in any modern web browser.
+3. Start drawing!
+
+---
+
+## 👨‍🔬 Author
+
+**Juganta Rajkhowa**

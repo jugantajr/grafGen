@@ -821,4 +821,141 @@ window.importJSON = function(e) {
     }; reader.readAsText(e.target.files[0]);
 }
 
+// 🎨 UPDATED: Greedy Auto-Coloring Algorithm (Lowercase Fix)
+window.autoColorGraph = function() {
+    if (window.points.length === 0) return;
+    
+    // 1. Strictly lowercase palette so getHexFromName() doesn't crash
+    const palette = ['blue', 'red', 'green', 'orange', 'purple', 'cyan', 'magenta', 'brown', 'black', 'gray'];
+    
+    // 2. Build adjacency list for undirected connections
+    let adj = {};
+    window.points.forEach(p => adj[p.id] = []);
+    
+    window.edges.forEach(e => {
+        if (['line', 'curve'].includes(e.type)) {
+            if (adj[e.sourceId] !== undefined && adj[e.targetId] !== undefined && e.sourceId !== e.targetId) {
+                adj[e.sourceId].push(e.targetId);
+                adj[e.targetId].push(e.sourceId);
+            }
+        }
+    });
+
+    // 3. Sort vertices by degree descending
+    let sortedPoints = [...window.points].sort((a, b) => adj[b.id].length - adj[a.id].length);
+    
+    let colorAssignment = {}; 
+    let maxColorUsed = 0;
+
+    // 4. Assign colors
+    sortedPoints.forEach(p => {
+        let neighborColors = new Set(adj[p.id].map(neighborId => colorAssignment[neighborId]).filter(c => c !== undefined));
+        
+        let c = 0;
+        while (neighborColors.has(c)) { 
+            c++; 
+        } 
+        
+        colorAssignment[p.id] = c;
+        if (c > maxColorUsed) maxColorUsed = c;
+
+        // Apply lowercase color to the actual point object
+        let actualPoint = window.points.find(wp => wp.id === p.id);
+        if (actualPoint) {
+            actualPoint.color = palette[c % palette.length]; 
+        }
+    });
+    
+    // 5. Save and Redraw
+    saveState(); 
+    if (typeof updatePropertyPanel === 'function') updatePropertyPanel(); 
+    if (typeof draw === 'function') draw();
+};
+
+// ✂️ UPDATED: Bipartite Snapper (Lowercase Fix)
+window.snapBipartite = function() {
+    if (window.points.length === 0) return;
+
+    let adj = {};
+    window.points.forEach(p => adj[p.id] = []);
+    window.edges.forEach(e => {
+        if (['line', 'curve'].includes(e.type)) {
+            if (adj[e.sourceId] !== undefined && adj[e.targetId] !== undefined && e.sourceId !== e.targetId) {
+                adj[e.sourceId].push(e.targetId);
+                adj[e.targetId].push(e.sourceId);
+            }
+        }
+    });
+
+    let color = {}; let parent = {}; let isBipartite = true;
+    let conflictEdge = null; let sets = {0: [], 1: []};
+
+    for (let i = 0; i < window.points.length; i++) {
+        let startNode = window.points[i];
+        if (color[startNode.id] === undefined) {
+            let queue = [startNode.id];
+            color[startNode.id] = 0;
+            sets[0].push(startNode.id);
+
+            while(queue.length > 0 && isBipartite) {
+                let u = queue.shift();
+                for (let v of adj[u]) {
+                    if (color[v] === undefined) {
+                        color[v] = 1 - color[u];
+                        sets[color[v]].push(v);
+                        parent[v] = u; queue.push(v);
+                    } else if (color[v] === color[u]) {
+                        isBipartite = false; conflictEdge = [u, v]; break;
+                    }
+                }
+            }
+        }
+        if (!isBipartite) break;
+    }
+
+    if (isBipartite) {
+        let cx = (canvasWidth / 2 - originX) / getUnitSize();
+        let cy = (originY - canvasHeight / 2) / getUnitSize();
+        let setA = sets[0]; let setB = sets[1];
+        let startYa = cy + ((setA.length-1) * 2) / 2; let startYb = cy + ((setB.length-1) * 2) / 2;
+
+        setA.forEach((id, idx) => {
+            let p = window.points.find(p => p.id === id);
+            if(p) { p.x = cx - 2.5; p.y = startYa - idx * 2; p.color = 'blue'; } // LOWERCASE
+        });
+        setB.forEach((id, idx) => {
+            let p = window.points.find(p => p.id === id);
+            if(p) { p.x = cx + 2.5; p.y = startYb - idx * 2; p.color = 'red'; } // LOWERCASE
+        });
+        
+        window.edges.forEach(e => { if (['line', 'curve'].includes(e.type)) e.color = 'black'; });
+        alert("Graph is Bipartite! Snapped into Set A (blue) and Set B (red).");
+    } else {
+        let u = conflictEdge[0], v = conflictEdge[1];
+        window.points.forEach(p => p.color = 'black');
+        window.edges.forEach(e => e.color = 'black');
+
+        let pathU = []; let curr = u; while(curr !== undefined) { pathU.push(curr); curr = parent[curr]; }
+        let pathV = []; curr = v; while(curr !== undefined) { pathV.push(curr); curr = parent[curr]; }
+        
+        let lca = null;
+        for(let node of pathU) { if (pathV.includes(node)) { lca = node; break; } }
+        
+        let cycleNodes = new Set();
+        if (lca !== null) {
+            for(let node of pathU) { cycleNodes.add(node); if (node === lca) break; }
+            for(let node of pathV) { cycleNodes.add(node); if (node === lca) break; }
+        }
+
+        cycleNodes.forEach(id => { let p = window.points.find(p => p.id === id); if (p) p.color = 'red'; }); // LOWERCASE
+        window.edges.forEach(e => {
+            if (cycleNodes.has(e.sourceId) && cycleNodes.has(e.targetId)) e.color = 'red'; // LOWERCASE
+        });
+
+        alert("Graph is NOT Bipartite! Found an odd-length cycle (highlighted in red).");
+    }
+    saveState(); updatePropertyPanel(); draw();
+};
+
+
 setTimeout(() => { saveState(); draw(); }, 100);
