@@ -3,121 +3,57 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pro Graph Code Builder</title>
+    <title>graphGen</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20,400,0,0" />
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20,400,0,0" />
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
     <div id="toolbar">
         <div class="toolbar-row">
+            <div class="tool-group" style="padding-right: 15px;">
+                <div style="font-size: 18px; font-weight: 800; color: #0056b3; display: flex; align-items: center; gap: 6px; letter-spacing: 0.5px;">
+                    <span class="material-symbols-outlined" style="font-size: 24px;">timeline</span>
+                    graphGen
+                </div>
+            </div>
             <div class="tool-group">
                 <button onclick="undo()" title="Undo (Ctrl+Z)" class="icon-btn"><span class="material-symbols-outlined">undo</span></button>
-
                 <button onclick="redo()" title="Redo (Ctrl+Y)" class="icon-btn"><span class="material-symbols-outlined">redo</span></button>
-
                 <button onclick="toggleLayout()" title="Switch layout for mobile" class="icon-btn" style="background: #343a40; color: white;"><span class="material-symbols-outlined">swap_vert</span></button>
-
                 <button onclick="clearAll()" title="Clear entire canvas" class="danger icon-btn"  style="background: #ff0101; color: white;"><span class="material-symbols-outlined">delete_sweep</span></button>
-
                 <button onclick="openInstructions()" title="View Instructions" class="icon-btn" style="background: #17a2b8; color: white; border-color: #117a8b; margin-left: 5px;"><span class="material-symbols-outlined">help</span></button>
-                
             </div>
             <div class="tool-group">
                 <button onclick="zoomIn()" title="Zoom In (+)" class="icon-btn"><span class="material-symbols-outlined">zoom_in</span></button>
                 <button onclick="zoomOut()" title="Zoom Out (-)" class="icon-btn"><span class="material-symbols-outlined">zoom_out</span></button>
                 <label title="Show/hide grid"><input type="checkbox" id="toggle-grid" checked onchange="draw()"> Grid</label>
                 <label title="Snap to grid intersections"><input type="checkbox" id="snap-grid" checked> Snap</label>
+                
             </div>
             <div class="tool-group">
                 <strong>Tools:</strong>
-    
-                <button id="mode-point" class="active icon-btn" onclick="setMode('point')" title="Point: Click canvas to drop points">
-                    <span class="material-symbols-outlined">radio_button_checked</span>
-                </button>
-    
-                <button id="mode-line" class="icon-btn" onclick="setMode('line')" title="Line: Connect two points">
-                    <span class="material-symbols-outlined">timeline</span>
-                </button>
-    
-                <button id="mode-curve" class="icon-btn" onclick="setMode('curve')" title="Curve: Click two points to draw a curved line">
-                    <span class="material-symbols-outlined">gesture</span>
-                </button>
-    
-                <button id="mode-circle" class="icon-btn" onclick="setMode('circle')" title="Circle: Click 1 point (center) for circle">
-                    <span class="material-symbols-outlined">radio_button_unchecked</span>
-                </button>
-    
-                <button id="mode-arc" class="icon-btn" onclick="setMode('arc')" title="Arc: Click 1 point for arc">
-                    <span class="material-symbols-outlined">incomplete_circle</span>
-                </button>
-    
-                <button id="mode-elliptic-arc" class="icon-btn" onclick="setMode('elliptic-arc')" title="Elliptic Arc: Click 2 points (foci) for ellipse">
-                    <span class="material-symbols-outlined">toll</span>
-                </button>
-    
-                <button id="mode-text" class="icon-btn" onclick="setMode('text')" title="Free Text: Add LaTeX math text" >
-                    <span class="material-symbols-outlined">text_fields</span>
-                </button>
-    
+                <button id="mode-point" class="active icon-btn" onclick="setMode('point')" title="Point: Click canvas to drop points"><span class="material-symbols-outlined">radio_button_checked</span></button>
+                <button id="mode-line" class="icon-btn" onclick="setMode('line')" title="Line: Connect two points"><span class="material-symbols-outlined">timeline</span></button>
+                <button id="mode-curve" class="icon-btn" onclick="setMode('curve')" title="Curve: Click two points to draw a curved line"><span class="material-symbols-outlined">gesture</span></button>
+                <button id="mode-circle" class="icon-btn" onclick="setMode('circle')" title="Circle: Click 1 point (center) for circle"><span class="material-symbols-outlined">radio_button_unchecked</span></button>
+                <button id="mode-arc" class="icon-btn" onclick="setMode('arc')" title="Arc: Click 1 point for arc"><span class="material-symbols-outlined">incomplete_circle</span></button>
+                <button id="mode-elliptic-arc" class="icon-btn" onclick="setMode('elliptic-arc')" title="Elliptic Arc: Click 2 points (foci) for ellipse"><span class="material-symbols-outlined">toll</span></button>
+                <button id="mode-region" class="icon-btn" onclick="setMode('region')" title="Region: Drag to draw a highlighted cluster block"><span class="material-symbols-outlined">highlight_alt</span></button>
+                <button id="mode-text" class="icon-btn" onclick="setMode('text')" title="Free Text: Add LaTeX math text"><span class="material-symbols-outlined">text_fields</span></button>
+                
                 <div class="divider"></div>
-    
-                <button id="mode-select" class="icon-btn" onclick="setMode('select')" title="Select: Select items (Shift+Click for multi-select)" style="color: #007bff;">
-                    <span class="material-symbols-outlined" >arrow_selector_tool</span>
-                </button>
-    
-                <button id="mode-move" class="icon-btn" onclick="setMode('move')" title="Move: Drag items or pan canvas" style="color: #007bff;">
-                    <span class="material-symbols-outlined">pan_tool</span>
-                </button>
-    
-                <button id="mode-delete" class="icon-btn" onclick="setMode('delete')" title="Eraser: Click item to delete" style="color: #dc3545;">
-                    <span class="material-symbols-outlined">ink_eraser</span>
-                </button>
+                <button id="mode-select" class="icon-btn" onclick="setMode('select')" title="Select: Select items (Shift+Click for multi-select)" style="color:#007bff;"><span class="material-symbols-outlined">arrow_selector_tool</span></button>
+                <button id="mode-move" class="icon-btn" onclick="setMode('move')" title="Move: Drag items or pan canvas"><span class="material-symbols-outlined">pan_tool</span></button>
+                <button id="mode-delete" class="icon-btn" onclick="setMode('delete')" title="Eraser: Click item to delete" style="color:#007bff;"><span class="material-symbols-outlined" style="color:#dc3545;">ink_eraser</span></button>
             </div>
-
-            
         </div>
 
         <div class="toolbar-row">
-            <div class="tool-group properties-panel">
-                <strong>Properties:</strong>
-                <span id="properties-placeholder">Select an item to edit</span>
-                
-                <div id="properties-wrapper">
-                    <div class="prop-wrapper" id="wrap-label">Text: <input type="text" id="prop-label" placeholder="..." style="width: 80px;"></div>
-                    <div class="prop-wrapper" id="wrap-angle">Angle: <input type="number" id="prop-label-angle" style="width: 50px;"></div>
-                    <div class="prop-wrapper" id="wrap-pos">Pos: 
-                        <select id="prop-label-pos">
-                            <option value="above">Above</option>
-                            <option value="below">Below</option>
-                            <option value="left">Left</option>
-                            <option value="right">Right</option>
-                            <option value="on">On Line</option>
-                        </select>
-                    </div>
-                    <div class="prop-wrapper" id="wrap-radius"><span id="lbl-radius">Radius:</span> <input type="number" id="prop-radius" style="width: 50px;"></div>
-                    <div class="prop-wrapper" id="wrap-offset">Curve Offset: <input type="number" step="0.5" id="prop-offset" style="width: 50px;" title="Distance from straight line"></div>
-                    <div class="prop-wrapper" id="wrap-start">Start°: <input type="number" id="prop-angle-start" style="width: 50px;"></div>
-                    <div class="prop-wrapper" id="wrap-end">End°: <input type="number" id="prop-angle-end" style="width: 50px;"></div>
-                    <div class="prop-wrapper" id="wrap-arrow">Arrow: 
-                        <select id="prop-arrow"><option value="none">None</option><option value="end">End -></option><option value="start">Start <-</option><option value="both">Both <-></option></select>
-                    </div>
-                    
-                    <div class="prop-wrapper" id="wrap-p-style">Style: <select id="point-style"><option value="solid">Solid</option><option value="none">Hollow</option></select></div>
-                    <div class="prop-wrapper" id="wrap-l-style">Style: <select id="line-style"><option value="solid">Solid</option><option value="dashed">Dashed</option><option value="dotted">Dotted</option></select></div>
-                    
-                    <div class="prop-wrapper" id="wrap-color">
-                        <div class="custom-select" id="color-picker" title="Change color">
-                            <div class="select-selected" id="current-color"><span class="color-box" style="background: Black;"></span> Black</div>
-                            <div class="select-items select-hide" id="color-list"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
             <div class="tool-group" style="background: #eef2f5; border-radius: 4px; padding: 4px 10px; border: 1px solid #ccd6e0;">
-                <strong style="color: #0056b3;">Macros:</strong>
+                <strong style="color: #0056b3;">Macros</strong>
                 <select id="macro-type" onchange="toggleMacroInputs()" title="Select shape">
                     <option value="Kn">Complete (Kn)</option>
                     <option value="Cn">Cycle (Cn)</option>
@@ -129,6 +65,31 @@
                 <input type="number" id="macro-m" value="3" min="1" max="50" style="width: 45px; display: none;" title="Left Partition (m)">
                 <button onclick="insertMacro()" style="background: #28a745; color: white; border-color: #218838; font-weight: bold;" title="Insert Graph">Insert</button>
             </div>
+            <div class="tool-group properties-panel">
+                <strong>Properties:</strong>
+                <span id="properties-placeholder">Select an item to edit</span>
+                <div id="properties-wrapper">
+                    <div class="prop-wrapper" id="wrap-label">Text: <input type="text" id="prop-label" placeholder="..." style="width: 80px;"></div>
+                    <div class="prop-wrapper" id="wrap-angle">Angle: <input type="number" id="prop-label-angle" style="width: 50px;"></div>
+                    <div class="prop-wrapper" id="wrap-pos">Pos: <select id="prop-label-pos"><option value="above">Above</option><option value="below">Below</option><option value="left">Left</option><option value="right">Right</option><option value="on">On Line</option></select></div>
+                    <div class="prop-wrapper" id="wrap-radius"><span id="lbl-radius">Radius:</span> <input type="number" id="prop-radius" style="width: 50px;"></div>
+                    <div class="prop-wrapper" id="wrap-offset">Curve Offset: <input type="number" step="0.5" id="prop-offset" style="width: 50px;"></div>
+                    <div class="prop-wrapper" id="wrap-start">Start°: <input type="number" id="prop-angle-start" style="width: 50px;"></div>
+                    <div class="prop-wrapper" id="wrap-end">End°: <input type="number" id="prop-angle-end" style="width: 50px;"></div>
+                    <div class="prop-wrapper" id="wrap-arrow">Arrow: <select id="prop-arrow"><option value="none">None</option><option value="end">End -></option><option value="start">Start <-</option><option value="both">Both <-></option></select></div>
+                    <div class="prop-wrapper" id="wrap-p-style">Style: <select id="point-style"><option value="solid">Solid</option><option value="none">Hollow</option></select></div>
+                    <div class="prop-wrapper" id="wrap-l-style">Style: <select id="line-style"><option value="solid">Solid</option><option value="dashed">Dashed</option><option value="dotted">Dotted</option></select></div>
+                    <div class="prop-wrapper" id="wrap-color">
+                        <div class="custom-select" id="color-picker" title="Change color">
+                            <div class="select-selected" id="current-color"><span class="color-box" style="background: Black;"></span> Black</div>
+                            <div class="select-items select-hide" id="color-list"></div>
+                        </div>
+                    </div>
+                    <button id="prop-delete-btn" class="danger icon-btn" onclick="deleteSelected()" title="Delete selected item(s)" style="margin-left: 5px;"><span class="material-symbols-outlined">delete</span></button>
+                </div>
+            </div>
+
+            
         </div>
     </div>
     
@@ -142,7 +103,10 @@
         <div id="right-panel">
             <div class="output-header">
                 <h3>Generated Code:</h3>
-                <div>
+                <div style="display: flex; gap: 5px;">
+                    <button onclick="exportImage()" title="Export transparent PNG" class="icon-btn" style="color: #e0b0ff; ">
+                <span class="material-symbols-outlined">image</span>
+                </button>
                     <button onclick="exportJSON()" title="Save graph project">Save JSON</button>
                     <button onclick="document.getElementById('file-import').click()" title="Load graph project">Load JSON</button>
                     <input type="file" id="file-import" style="display: none;" accept=".json" onchange="importJSON(event)">
@@ -169,30 +133,29 @@
             <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
             
             <div style="display: flex; flex-wrap: wrap; gap: 20px;">
-                
                 <div style="flex: 1; min-width: 300px;">
                     <h3 style="color: #333; margin-bottom: 10px;">🛠️ Drawing Tools</h3>
                     <ul style="line-height: 1.8; list-style: none; padding-left: 0; margin-top: 0;">
                         <li><span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 5px; color: #555;">radio_button_checked</span> <b>Point:</b> Click the canvas to drop nodes.</li>
                         <li><span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 5px; color: #555;">timeline</span> <b>Line:</b> Click two points sequentially to connect them.</li>
-                        <li><span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 5px; color: #555;">gesture</span> <b>Curve:</b> Click two points to draw a bezier curve (adjust offset in Properties).</li>
-                        <li><span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 5px; color: #555;">radio_button_unchecked</span> <b>Circle:</b> Click one point to create a circle centered around it.</li>
+                        <li><span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 5px; color: #555;">gesture</span> <b>Curve:</b> Click two points to draw a bezier curve.</li>
+                        <li><span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 5px; color: #555;">radio_button_unchecked</span> <b>Circle:</b> Click one point to create a circle.</li>
                         <li><span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 5px; color: #555;">incomplete_circle</span> <b>Arc:</b> Click one point to create an open arc.</li>
-                        <li><span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 5px; color: #555;">toll</span> <b>Elliptic Arc:</b> Click two points to set the foci of an ellipse.</li>
-                        <li><span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 5px; color: #555;">text_fields</span> <b>Free Text:</b> Click anywhere to add a floating LaTeX math label.</li>
+                        <li><span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 5px; color: #555;">toll</span> <b>Elliptic Arc:</b> Click two points to set the foci.</li>
+                        <li><span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 5px; color: #555;">highlight_alt</span> <b>Region:</b> Drag a box to draw a cluster highlight background.</li>
+                        <li><span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 5px; color: #555;">text_fields</span> <b>Free Text:</b> Click anywhere to add LaTeX math text.</li>
                     </ul>
-                    <p style="font-size: 12px; color: #666; font-style: italic;">* Drawing tools are continuous. You can click rapidly to build large networks without re-selecting the tool.</p>
                 </div>
 
                 <div style="flex: 1; min-width: 300px;">
                     <h3 style="color: #333; margin-bottom: 10px;">🖱️ Actions & System</h3>
                     <ul style="line-height: 1.8; list-style: none; padding-left: 0; margin-top: 0;">
-                        <li><span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 5px; color: #007bff;">arrow_selector_tool</span> <b>Select:</b> Click items to edit properties. <b>Hold Shift</b> to select multiple items.</li>
-                        <li><span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 5px; color: #007bff;">pan_tool</span> <b>Move:</b> Drag items or drag empty canvas space to pan.</li>
+                        <li><span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 5px; color: #007bff;">arrow_selector_tool</span> <b>Select:</b> Click items to edit. <b>Hold Shift</b> for multi-select.</li>
+                        <li><span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 5px; color: #007bff;">pan_tool</span> <b>Move:</b> Drag items or drag empty canvas to pan.</li>
                         <li><span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 5px; color: #dc3545;">ink_eraser</span> <b>Eraser:</b> Click any item to instantly delete it.</li>
                         <li><span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 5px; color: #555;">undo</span> / <span class="material-symbols-outlined" style="vertical-align: middle; color: #555;">redo</span> <b>Undo & Redo:</b> Step backward or forward.</li>
                         <li><span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 5px; color: #555;">swap_vert</span> <b>Layout:</b> Toggle vertical/horizontal panel split.</li>
-                        <li><span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 5px; color: #dc3545;">delete_sweep</span> <b>Clear All:</b> Wipe the entire canvas.</li>
+                        <li><span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 5px; color: #e0b0ff;">image</span> <b>Export Image:</b> Download transparent PNG.</li>
                     </ul>
 
                     <h3 style="color: #333; margin-bottom: 10px; margin-top: 20px;">⌨️ Keyboard Shortcuts</h3>
@@ -205,7 +168,7 @@
             </div>
             
             <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
-            <p style="font-size: 13px; color: #555;"><b>💡 Pro Tip for LaTeX Labels:</b> To break a line with an edge label, select the edge, and in the Properties Panel set the <b>Pos:</b> dropdown to <b>"On Line"</b>.</p>
+            <p style="font-size: 13px; color: #555;"><b>💡 Pro Tip for Edge Labels:</b> In the properties panel, change the <b>Pos:</b> dropdown to "On Line" to draw text with a white background directly over an edge (standard LaTeX convention), or use "Above/Below/Left/Right" for exact offset positioning.</p>
         </div>
     </div>
 

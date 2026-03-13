@@ -1,6 +1,7 @@
 function getBounds() {
-    if(window.points.length === 0 && window.texts.length === 0) return { minX: -1, maxX: 1, minY: -1, maxY: 1 };
+    if(window.points.length === 0 && window.texts.length === 0 && window.regions.length === 0) return { minX: -1, maxX: 1, minY: -1, maxY: 1 };
     let minX = 0, maxX = 0, minY = 0, maxY = 0;
+    
     window.points.forEach(p => {
         if (p.x < minX) minX = Math.floor(p.x); if (p.x > maxX) maxX = Math.ceil(p.x);
         if (p.y < minY) minY = Math.floor(p.y); if (p.y > maxY) maxY = Math.ceil(p.y);
@@ -8,6 +9,10 @@ function getBounds() {
     window.texts.forEach(t => {
         if (t.x < minX) minX = Math.floor(t.x); if (t.x > maxX) maxX = Math.ceil(t.x);
         if (t.y < minY) minY = Math.floor(t.y); if (t.y > maxY) maxY = Math.ceil(t.y);
+    });
+    window.regions.forEach(r => {
+        if (r.minX < minX) minX = Math.floor(r.minX); if (r.maxX > maxX) maxX = Math.ceil(r.maxX);
+        if (r.minY < minY) minY = Math.floor(r.minY); if (r.maxY > maxY) maxY = Math.ceil(r.maxY);
     });
     window.edges.forEach(e => {
         let p1 = window.points.find(p => p.id === e.sourceId); if (!p1) return;
@@ -37,7 +42,7 @@ function getBounds() {
 window.generateCode = function() {
     const format = document.getElementById('code-format').value;
     const out = document.getElementById('codeOutput');
-    if (window.points.length === 0 && window.texts.length === 0) { out.value = "% Add points to generate code!"; return; }
+    if (window.points.length === 0 && window.texts.length === 0 && window.regions.length === 0) { out.value = "% Add points to generate code!"; return; }
     
     let b = getBounds(); let latex = "";
     
@@ -45,6 +50,15 @@ window.generateCode = function() {
         latex += `% Requires: \\usepackage{pstricks, pst-node, pst-plot}\n`;
         latex += `\\begin{pspicture}(${b.minX},${b.minY})(${b.maxX},${b.maxY})\n`;
         latex += `    \\def\\r{2pt}\n    \\psgrid[subgriddiv=1,griddots=10,gridlabels=7pt](${b.minX},${b.minY})(${b.maxX},${b.maxY})\n\n`;
+
+        // Render Regions first so they sit in the background
+        if (window.regions && window.regions.length > 0) {
+            latex += `    % Clusters / Regions\n`;
+            window.regions.forEach(r => {
+                latex += `    \\psframe[linestyle=none, fillstyle=solid, fillcolor=${r.color}, opacity=0.15, framearc=0.3](${r.minX},${r.minY})(${r.maxX},${r.maxY})\n`;
+            });
+            latex += `\n`;
+        }
 
         window.points.forEach((p) => {
             let fill = p.style === 'solid' ? `fillstyle=solid, fillcolor=${p.color}` : `fillstyle=solid, fillcolor=white`;
@@ -59,19 +73,17 @@ window.generateCode = function() {
             if (e.style === 'dashed') st += ", linestyle=dashed";
             if (e.style === 'dotted') st += ", linestyle=dotted";
             
-            // LABEL POSITIONING FOR PSTRICKS
             let lbl = "";
             if (e.label && e.label !== "") {
                 if (e.labelPos === 'above') lbl = ` \\naput{ $${e.label}$}`; 
                 else if (e.labelPos === 'below') lbl = ` \\nbput{ $${e.label}$}`; 
                 else if (e.labelPos === 'left') lbl = ` \\ncput{\\uput[180](0,0){ $${e.label}$}}`; 
                 else if (e.labelPos === 'right') lbl = ` \\ncput{\\uput[0](0,0){ $${e.label}$}}`; 
-                else if (e.labelPos === 'on') lbl = ` \\ncput*{ $${e.label}$}`; // The star '*' fills background white
-                else lbl = ` \\naput{ $${e.label}$}`; // fallback
+                else if (e.labelPos === 'on') lbl = ` \\ncput*{ $${e.label}$}`; 
+                else lbl = ` \\naput{ $${e.label}$}`; 
             }
 
-            let p1 = window.points.find(p => p.id === e.sourceId);
-            if (!p1) return;
+            let p1 = window.points.find(p => p.id === e.sourceId); if (!p1) return;
 
             let arrowCmd = '';
             if (e.arrow === 'end') arrowCmd = '{->}'; else if (e.arrow === 'start') arrowCmd = '{<-}'; else if (e.arrow === 'both') arrowCmd = '{<->}';
@@ -105,6 +117,14 @@ window.generateCode = function() {
         latex += `% Requires: \\usepackage{tikz}\n`;
         latex += `\\begin{tikzpicture}\n    \\draw[help lines, step=1.0] (${b.minX},${b.minY}) grid (${b.maxX},${b.maxY});\n\n`;
         
+        if (window.regions && window.regions.length > 0) {
+            latex += `    % Clusters / Regions\n`;
+            window.regions.forEach(r => {
+                latex += `    \\draw [draw=none, fill=${r.color}, fill opacity=0.15, rounded corners=15pt] (${r.minX},${r.minY}) rectangle (${r.maxX},${r.maxY});\n`;
+            });
+            latex += `\n`;
+        }
+
         window.points.forEach((p) => {
             let fill = p.style === 'solid' ? p.color : 'white'; let ang = p.labelAngle !== undefined ? p.labelAngle : 90;
             let lbl = p.label !== "" ? `, label={${ang}: $${p.label}$}` : '';
@@ -115,7 +135,6 @@ window.generateCode = function() {
         window.edges.forEach((e) => {
             let st = e.style === 'dashed' ? ', dashed' : e.style === 'dotted' ? ', dotted' : '';
             
-            // LABEL POSITIONING FOR TIKZ
             let lbl = "";
             if (e.label && e.label !== "") {
                 let pos = "";
@@ -124,13 +143,11 @@ window.generateCode = function() {
                 else if (e.labelPos === 'left') pos = "left";
                 else if (e.labelPos === 'right') pos = "right";
                 
-                // "on" does not pass a direction string, which defaults to centering the node directly ON the line.
                 let fillOpts = e.labelPos === 'on' ? "fill=white, inner sep=2pt" : `fill=white, inner sep=2pt, ${pos}`;
                 lbl = ` node[${fillOpts}] { $${e.label}$}`;
             }
 
-            let p1 = window.points.find(p => p.id === e.sourceId);
-            if (!p1) return;
+            let p1 = window.points.find(p => p.id === e.sourceId); if (!p1) return;
 
             let arrowCmd = '';
             if (e.arrow === 'end') arrowCmd = '->, '; else if (e.arrow === 'start') arrowCmd = '<-, '; else if (e.arrow === 'both') arrowCmd = '<->, ';

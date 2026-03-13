@@ -22,16 +22,16 @@ const resizeObserver = new ResizeObserver(entries => {
 });
 resizeObserver.observe(document.getElementById('canvas-container'));
 
-window.points = []; window.edges = []; window.texts = []; 
-window.pointIdCounter = 0; window.edgeIdCounter = 0; window.textIdCounter = 0;
+window.points = []; window.edges = []; window.texts = []; window.regions = [];
+window.pointIdCounter = 0; window.edgeIdCounter = 0; window.textIdCounter = 0; window.regionIdCounter = 0;
 
 let historyState = []; let historyIndex = -1;
 
 window.saveState = function() {
     if (historyIndex < historyState.length - 1) historyState = historyState.slice(0, historyIndex + 1);
     historyState.push(JSON.stringify({
-        points: window.points, edges: window.edges, texts: window.texts,
-        pId: window.pointIdCounter, eId: window.edgeIdCounter, tId: window.textIdCounter
+        points: window.points, edges: window.edges, texts: window.texts, regions: window.regions,
+        pId: window.pointIdCounter, eId: window.edgeIdCounter, tId: window.textIdCounter, rId: window.regionIdCounter
     }));
     historyIndex++;
 };
@@ -39,26 +39,27 @@ window.saveState = function() {
 window.undo = function() {
     if (historyIndex > 0) {
         historyIndex--; let state = JSON.parse(historyState[historyIndex]);
-        window.points = state.points; window.edges = state.edges; window.texts = state.texts;
-        window.pointIdCounter = state.pId; window.edgeIdCounter = state.eId; window.textIdCounter = state.tId;
-        window.selectedPointIds = []; window.selectedEdgeIds = []; window.selectedTextIds = []; updatePropertyPanel(); draw();
+        window.points = state.points; window.edges = state.edges; window.texts = state.texts; window.regions = state.regions || [];
+        window.pointIdCounter = state.pId; window.edgeIdCounter = state.eId; window.textIdCounter = state.tId; window.regionIdCounter = state.rId || 0;
+        window.selectedPointIds = []; window.selectedEdgeIds = []; window.selectedTextIds = []; window.selectedRegionIds = []; updatePropertyPanel(); draw();
     }
 };
 
 window.redo = function() {
     if (historyIndex < historyState.length - 1) {
         historyIndex++; let state = JSON.parse(historyState[historyIndex]);
-        window.points = state.points; window.edges = state.edges; window.texts = state.texts;
-        window.pointIdCounter = state.pId; window.edgeIdCounter = state.eId; window.textIdCounter = state.tId;
-        window.selectedPointIds = []; window.selectedEdgeIds = []; window.selectedTextIds = []; updatePropertyPanel(); draw();
+        window.points = state.points; window.edges = state.edges; window.texts = state.texts; window.regions = state.regions || [];
+        window.pointIdCounter = state.pId; window.edgeIdCounter = state.eId; window.textIdCounter = state.tId; window.regionIdCounter = state.rId || 0;
+        window.selectedPointIds = []; window.selectedEdgeIds = []; window.selectedTextIds = []; window.selectedRegionIds = []; updatePropertyPanel(); draw();
     }
 };
 
 let currentMode = 'point'; 
-window.selectedPointIds = []; window.selectedEdgeIds = []; window.selectedTextIds = [];
+window.selectedPointIds = []; window.selectedEdgeIds = []; window.selectedTextIds = []; window.selectedRegionIds = [];
 
-let isDragging = false; let draggedPointId = null; let draggedTextId = null; let lastDragMath = null; 
+let isDragging = false; let draggedPointId = null; let draggedTextId = null; let draggedRegionId = null; let lastDragMath = null; 
 let isPanning = false; let lastPanX = 0; let lastPanY = 0;
+let isDrawingRegion = false;
 let activeSnapLineX = null; let activeSnapLineY = null;
 
 function getUnitSize() { return baseUnitSize * window.zoom; }
@@ -83,7 +84,7 @@ function mathToScreen(mx, my) { return { x: originX + (mx * getUnitSize()), y: o
 
 window.setMode = function(mode, keepSelection = false) {
     currentMode = mode; 
-    if (!keepSelection) { window.selectedPointIds = []; window.selectedEdgeIds = []; window.selectedTextIds = []; }
+    if (!keepSelection) { window.selectedPointIds = []; window.selectedEdgeIds = []; window.selectedTextIds = []; window.selectedRegionIds = []; }
     document.querySelectorAll('.tool-group button').forEach(btn => btn.classList.remove('active'));
     let btn = document.getElementById(`mode-${mode}`); if(btn) btn.classList.add('active');
     
@@ -107,6 +108,7 @@ window.applyPropertyToSelection = function(prop, value) {
     window.selectedPointIds.forEach(id => { let p = window.points.find(p => p.id === id); if(p) { p[prop] = value; changed = true; } });
     window.selectedEdgeIds.forEach(id => { let e = window.edges.find(e => e.id === id); if(e) { e[prop] = value; changed = true; } });
     window.selectedTextIds.forEach(id => { let t = window.texts.find(t => t.id === id); if(t) { t[prop] = value; changed = true; } });
+    window.selectedRegionIds.forEach(id => { let r = window.regions.find(r => r.id === id); if(r) { r[prop] = value; changed = true; } });
     if (changed) { saveState(); draw(); }
 };
 
@@ -117,21 +119,18 @@ window.deleteSelected = function() {
         window.edges = window.edges.filter(e => !window.selectedPointIds.includes(e.sourceId) && !window.selectedPointIds.includes(e.targetId));
         window.selectedPointIds = []; changed = true;
     } 
-    if (window.selectedEdgeIds.length > 0) {
-        window.edges = window.edges.filter(e => !window.selectedEdgeIds.includes(e.id));
-        window.selectedEdgeIds = []; changed = true;
-    }
-    if (window.selectedTextIds.length > 0) {
-        window.texts = window.texts.filter(t => !window.selectedTextIds.includes(t.id));
-        window.selectedTextIds = []; changed = true;
-    }
+    if (window.selectedEdgeIds.length > 0) { window.edges = window.edges.filter(e => !window.selectedEdgeIds.includes(e.id)); window.selectedEdgeIds = []; changed = true; }
+    if (window.selectedTextIds.length > 0) { window.texts = window.texts.filter(t => !window.selectedTextIds.includes(t.id)); window.selectedTextIds = []; changed = true; }
+    if (window.selectedRegionIds.length > 0) { window.regions = window.regions.filter(r => !window.selectedRegionIds.includes(r.id)); window.selectedRegionIds = []; changed = true; }
+    
     if (changed) { saveState(); updatePropertyPanel(); draw(); }
 };
 
 window.clearAll = function() {
     if(confirm("Are you sure you want to clear the entire graph?")) {
-        window.points = []; window.edges = []; window.texts = [];
-        window.selectedPointIds = []; window.selectedEdgeIds = []; window.selectedTextIds = [];
+        window.points = []; window.edges = []; window.texts = []; window.regions = [];
+        window.selectedPointIds = []; window.selectedEdgeIds = []; window.selectedTextIds = []; window.selectedRegionIds = [];
+        window.pointIdCounter = 0; window.edgeIdCounter = 0; window.textIdCounter = 0; window.regionIdCounter = 0;
         saveState(); updatePropertyPanel(); draw();
     }
 };
@@ -183,16 +182,23 @@ window.insertMacro = function() {
 function updatePropertyPanel() {
     const wPanel = document.getElementById('properties-wrapper');
     const pPlaceholder = document.getElementById('properties-placeholder');
+    const delBtn = document.getElementById('prop-delete-btn');
     
     ['wrap-label','wrap-angle','wrap-pos','wrap-radius','wrap-offset','wrap-start','wrap-end','wrap-arrow','wrap-p-style','wrap-l-style'].forEach(id => {
         document.getElementById(id).style.display = 'none';
     });
 
-    if (window.selectedPointIds.length === 0 && window.selectedEdgeIds.length === 0 && window.selectedTextIds.length === 0) {
+    // Reset button initially disabled
+    if(delBtn) delBtn.disabled = true;
+
+    if (window.selectedPointIds.length === 0 && window.selectedEdgeIds.length === 0 && window.selectedTextIds.length === 0 && window.selectedRegionIds.length === 0) {
         wPanel.style.display = 'none'; pPlaceholder.style.display = 'inline'; return;
     }
 
     wPanel.style.display = 'flex'; pPlaceholder.style.display = 'none';
+    
+    // 🔥 BUG FIX: IF ANYTHING IS SELECTED, ENABLE THE TRASH BUTTON 🔥
+    if(delBtn) delBtn.disabled = false; 
 
     if (window.selectedPointIds.length > 0) {
         let p = window.points.find(p => p.id === window.selectedPointIds[0]); if(!p) return;
@@ -204,22 +210,12 @@ function updatePropertyPanel() {
         let e = window.edges.find(e => e.id === window.selectedEdgeIds[0]); if(!e) return;
         document.getElementById('wrap-label').style.display = 'flex'; document.getElementById('prop-label').value = e.label || "";
         document.getElementById('wrap-pos').style.display = 'flex'; document.getElementById('prop-label-pos').value = e.labelPos || "above";
-        
-        if (['line', 'curve', 'arc', 'elliptic-arc'].includes(e.type)) { 
-            document.getElementById('wrap-arrow').style.display = 'flex'; document.getElementById('prop-arrow').value = e.arrow || "none"; 
-        }
-        if (e.type === 'curve') {
-            document.getElementById('wrap-offset').style.display = 'flex'; document.getElementById('prop-offset').value = e.offset;
-        }
+        if (['line', 'curve', 'arc', 'elliptic-arc'].includes(e.type)) { document.getElementById('wrap-arrow').style.display = 'flex'; document.getElementById('prop-arrow').value = e.arrow || "none"; }
+        if (e.type === 'curve') { document.getElementById('wrap-offset').style.display = 'flex'; document.getElementById('prop-offset').value = e.offset; }
         if (['arc', 'elliptic-arc', 'circle'].includes(e.type)) {
             document.getElementById('wrap-radius').style.display = 'flex'; document.getElementById('prop-radius').value = e.radius;
-            if (e.type === 'elliptic-arc') { document.getElementById('lbl-radius').innerText = "Axis(a):"; } 
-            else { document.getElementById('lbl-radius').innerText = "Radius:"; }
-            
-            if (e.type !== 'circle') {
-                document.getElementById('wrap-start').style.display = 'flex'; document.getElementById('prop-angle-start').value = e.startAngle;
-                document.getElementById('wrap-end').style.display = 'flex'; document.getElementById('prop-angle-end').value = e.endAngle;
-            }
+            if (e.type === 'elliptic-arc') { document.getElementById('lbl-radius').innerText = "Axis(a):"; } else { document.getElementById('lbl-radius').innerText = "Radius:"; }
+            if (e.type !== 'circle') { document.getElementById('wrap-start').style.display = 'flex'; document.getElementById('prop-angle-start').value = e.startAngle; document.getElementById('wrap-end').style.display = 'flex'; document.getElementById('prop-angle-end').value = e.endAngle; }
         }
         document.getElementById('wrap-l-style').style.display = 'flex'; document.getElementById('line-style').value = e.style;
         document.getElementById('current-color').innerHTML = `<span class="color-box" style="background: ${window.getHexFromName(e.color)};"></span> ${e.color}`;
@@ -227,6 +223,9 @@ function updatePropertyPanel() {
         let t = window.texts.find(t => t.id === window.selectedTextIds[0]); if(!t) return;
         document.getElementById('wrap-label').style.display = 'flex'; document.getElementById('prop-label').value = t.text || "";
         document.getElementById('current-color').innerHTML = `<span class="color-box" style="background: ${window.getHexFromName(t.color)};"></span> ${t.color}`;
+    } else if (window.selectedRegionIds.length > 0) {
+        let r = window.regions.find(r => r.id === window.selectedRegionIds[0]); if(!r) return;
+        document.getElementById('current-color').innerHTML = `<span class="color-box" style="background: ${window.getHexFromName(r.color)};"></span> ${r.color}`;
     }
 }
 
@@ -259,22 +258,19 @@ canvas.addEventListener('mousedown', (e) => {
     const mx = e.clientX - canvas.getBoundingClientRect().left; 
     const my = e.clientY - canvas.getBoundingClientRect().top;
     
-    let pId = null, tId = null, eId = null;
+    let pId = null, tId = null, eId = null, rId = null;
 
     let pObj = window.points.find(p => Math.hypot(mathToScreen(p.x, p.y).x - mx, mathToScreen(p.x, p.y).y - my) < 15);
     if (pObj) pId = pObj.id;
 
     if (pId === null) {
-        let tObj = window.texts.find(t => {
-            let s = mathToScreen(t.x, t.y); return Math.abs(mx - s.x) < 50 && Math.abs(my - s.y) < 25; 
-        });
+        let tObj = window.texts.find(t => { let s = mathToScreen(t.x, t.y); return Math.abs(mx - s.x) < 50 && Math.abs(my - s.y) < 25; });
         if (tObj) tId = tObj.id;
     }
 
     if (pId === null && tId === null) {
         let eObj = window.edges.find(ed => {
             let p1 = window.points.find(p => p.id === ed.sourceId); if(!p1) return false; let s1 = mathToScreen(p1.x, p1.y); 
-            
             if (ed.type === 'line') {
                 let p2 = window.points.find(p => p.id === ed.targetId); if(!p2) return false; let s2 = mathToScreen(p2.x, p2.y);
                 return distToSegment(mx, my, s1.x, s1.y, s2.x, s2.y) < 15;
@@ -284,19 +280,16 @@ canvas.addEventListener('mousedown', (e) => {
                 let dx = s2.x - s1.x, dy = s2.y - s1.y; let len = Math.hypot(dx, dy);
                 if (len === 0) return false;
                 let nx = dy / len, ny = -dx / len; 
-                let cx = (s1.x + s2.x)/2 + 2 * d_screen * nx;
-                let cy = (s1.y + s2.y)/2 + 2 * d_screen * ny;
+                let cx = (s1.x + s2.x)/2 + 2 * d_screen * nx; let cy = (s1.y + s2.y)/2 + 2 * d_screen * ny;
                 let minDist = Infinity;
                 for (let t=0; t<=1; t+=0.1) {
-                    let bx = (1-t)*(1-t)*s1.x + 2*(1-t)*t*cx + t*t*s2.x;
-                    let by = (1-t)*(1-t)*s1.y + 2*(1-t)*t*cy + t*t*s2.y;
+                    let bx = (1-t)*(1-t)*s1.x + 2*(1-t)*t*cx + t*t*s2.x; let by = (1-t)*(1-t)*s1.y + 2*(1-t)*t*cy + t*t*s2.y;
                     minDist = Math.min(minDist, Math.hypot(mx - bx, my - by));
-                }
-                return minDist < 15;
+                } return minDist < 15;
             } else if (ed.type === 'circle' || ed.type === 'arc') {
                 let r = ed.radius * getUnitSize(); return Math.abs(Math.hypot(s1.x - mx, s1.y - my) - r) < 15;
             } else if (ed.type === 'elliptic-arc') {
-                let p2 = window.points.find(p => p.id === ed.targetId); if(!p2) return false; let s2 = mathToScreen(p2.x, p2.y);
+                let p2 = window.points.find(p => p.id === e.targetId); if(!p2) return false; let s2 = mathToScreen(p2.x, p2.y);
                 let sum = Math.hypot(s1.x - mx, s1.y - my) + Math.hypot(s2.x - mx, s2.y - my);
                 return Math.abs(sum - (2 * ed.radius * getUnitSize())) < 20; 
             } return false;
@@ -304,45 +297,59 @@ canvas.addEventListener('mousedown', (e) => {
         if (eObj) eId = eObj.id;
     }
 
+    if (pId === null && tId === null && eId === null && currentMode !== 'region') {
+        for (let i = window.regions.length - 1; i >= 0; i--) {
+            let r = window.regions[i];
+            let sTopL = mathToScreen(r.minX, r.maxY); let sBotR = mathToScreen(r.maxX, r.minY);
+            if (mx >= sTopL.x && mx <= sBotR.x && my >= sTopL.y && my <= sBotR.y) { rId = r.id; break; }
+        }
+    }
+
     if (currentMode === 'delete') {
         if (pId !== null) {
             window.points = window.points.filter(p => p.id !== pId);
             window.edges = window.edges.filter(ed => ed.sourceId !== pId && ed.targetId !== pId);
-            window.selectedPointIds = window.selectedPointIds.filter(id => id !== pId);
-        } else if (tId !== null) { window.texts = window.texts.filter(t => t.id !== tId); window.selectedTextIds = window.selectedTextIds.filter(id => id !== tId); }
-        else if (eId !== null) { window.edges = window.edges.filter(ed => ed.id !== eId); window.selectedEdgeIds = window.selectedEdgeIds.filter(id => id !== eId); }
+        } else if (tId !== null) { window.texts = window.texts.filter(t => t.id !== tId); }
+        else if (eId !== null) { window.edges = window.edges.filter(ed => ed.id !== eId); }
+        else if (rId !== null) { window.regions = window.regions.filter(r => r.id !== rId); }
+        window.selectedPointIds = []; window.selectedEdgeIds = []; window.selectedTextIds = []; window.selectedRegionIds = [];
         saveState(); updatePropertyPanel(); draw(); return;
+    }
+
+    if (currentMode === 'region') {
+        let m = screenToMath(mx, my);
+        let newId = window.regionIdCounter++;
+        window.regions.push({ id: newId, minX: m.x, minY: m.y, maxX: m.x, maxY: m.y, color: window.activeColor });
+        isDrawingRegion = true; draggedRegionId = newId; return;
     }
 
     if (currentMode === 'select' || currentMode === 'move') {
         if (pId !== null) {
-            if (e.shiftKey) {
-                if (window.selectedPointIds.includes(pId)) window.selectedPointIds = window.selectedPointIds.filter(id => id !== pId);
-                else window.selectedPointIds.push(pId);
-            } else { if (!window.selectedPointIds.includes(pId)) { window.selectedPointIds = [pId]; window.selectedEdgeIds = []; window.selectedTextIds = []; } }
+            if (e.shiftKey) { if (window.selectedPointIds.includes(pId)) window.selectedPointIds = window.selectedPointIds.filter(id => id !== pId); else window.selectedPointIds.push(pId); } 
+            else { if (!window.selectedPointIds.includes(pId)) { window.selectedPointIds = [pId]; window.selectedEdgeIds = []; window.selectedTextIds = []; window.selectedRegionIds = []; } }
             if (currentMode === 'move') { isDragging = true; draggedPointId = pId; let pRef = window.points.find(p => p.id === pId); lastDragMath = {x: pRef.x, y: pRef.y}; }
         } 
         else if (tId !== null) { 
-            if (e.shiftKey) {
-                if (window.selectedTextIds.includes(tId)) window.selectedTextIds = window.selectedTextIds.filter(id => id !== tId);
-                else window.selectedTextIds.push(tId);
-            } else { if (!window.selectedTextIds.includes(tId)) { window.selectedTextIds = [tId]; window.selectedPointIds = []; window.selectedEdgeIds = []; } }
+            if (e.shiftKey) { if (window.selectedTextIds.includes(tId)) window.selectedTextIds = window.selectedTextIds.filter(id => id !== tId); else window.selectedTextIds.push(tId); } 
+            else { if (!window.selectedTextIds.includes(tId)) { window.selectedTextIds = [tId]; window.selectedPointIds = []; window.selectedEdgeIds = []; window.selectedRegionIds = []; } }
             if (currentMode === 'move') { isDragging = true; draggedTextId = tId; let tRef = window.texts.find(t => t.id === tId); lastDragMath = {x: tRef.x, y: tRef.y}; } 
         } 
         else if (eId !== null) { 
-            if (e.shiftKey) {
-                if (window.selectedEdgeIds.includes(eId)) window.selectedEdgeIds = window.selectedEdgeIds.filter(id => id !== eId);
-                else window.selectedEdgeIds.push(eId);
-            } else { if (!window.selectedEdgeIds.includes(eId)) { window.selectedEdgeIds = [eId]; window.selectedPointIds = []; window.selectedTextIds = []; } }
-        } 
-        else { window.selectedPointIds = []; window.selectedEdgeIds = []; window.selectedTextIds = []; isPanning = true; lastPanX = mx; lastPanY = my; canvas.style.cursor = 'grabbing'; }
-        
+            if (e.shiftKey) { if (window.selectedEdgeIds.includes(eId)) window.selectedEdgeIds = window.selectedEdgeIds.filter(id => id !== eId); else window.selectedEdgeIds.push(eId); } 
+            else { if (!window.selectedEdgeIds.includes(eId)) { window.selectedEdgeIds = [eId]; window.selectedPointIds = []; window.selectedTextIds = []; window.selectedRegionIds = []; } }
+        }
+        else if (rId !== null) {
+            if (e.shiftKey) { if (window.selectedRegionIds.includes(rId)) window.selectedRegionIds = window.selectedRegionIds.filter(id => id !== rId); else window.selectedRegionIds.push(rId); } 
+            else { if (!window.selectedRegionIds.includes(rId)) { window.selectedRegionIds = [rId]; window.selectedPointIds = []; window.selectedTextIds = []; window.selectedEdgeIds = []; } }
+            if (currentMode === 'move') { isDragging = true; draggedRegionId = rId; let rRef = window.regions.find(r => r.id === rId); lastDragMath = {x: rRef.minX, y: rRef.minY}; }
+        }
+        else { window.selectedPointIds = []; window.selectedEdgeIds = []; window.selectedTextIds = []; window.selectedRegionIds = []; isPanning = true; lastPanX = mx; lastPanY = my; canvas.style.cursor = 'grabbing'; }
         if (window.updatePropertyPanel) window.updatePropertyPanel();
     } 
     else if (currentMode === 'point' && !pId) {
         let m = screenToMath(mx, my); let newId = window.pointIdCounter++;
         window.points.push({ id: newId, x: m.x, y: m.y, color: window.activeColor, style: 'solid', label: String(window.points.length + 1) });
-        window.selectedPointIds = [newId]; window.selectedEdgeIds = []; window.selectedTextIds = [];
+        window.selectedPointIds = [newId]; window.selectedEdgeIds = []; window.selectedTextIds = []; window.selectedRegionIds = [];
         saveState(); if (window.updatePropertyPanel) window.updatePropertyPanel();
     } 
     else if (currentMode === 'text' && !tId) {
@@ -359,46 +366,36 @@ canvas.addEventListener('mousedown', (e) => {
             if (input.value) {
                 let newId = window.textIdCounter++;
                 window.texts.push({ id: newId, x: m.x, y: m.y, text: input.value, color: window.activeColor });
-                window.selectedTextIds = [newId]; window.selectedPointIds = []; window.selectedEdgeIds = []; setMode('select', true); saveState();
+                window.selectedTextIds = [newId]; window.selectedPointIds = []; window.selectedEdgeIds = []; window.selectedRegionIds = []; setMode('select', true); saveState();
             }
             input.remove(); draw();
         };
     } 
     else if (['line', 'curve'].includes(currentMode) && pId !== null) {
-        if (window.selectedPointIds.length === 0) {
-            window.selectedPointIds = [pId]; window.selectedEdgeIds = []; window.selectedTextIds = [];
-            if (window.updatePropertyPanel) window.updatePropertyPanel();
-        }
+        if (window.selectedPointIds.length === 0) { window.selectedPointIds = [pId]; window.selectedEdgeIds = []; window.selectedTextIds = []; window.selectedRegionIds = []; if (window.updatePropertyPanel) window.updatePropertyPanel(); }
         else if (window.selectedPointIds[0] !== pId) {
             let newId = window.edgeIdCounter++;
             window.edges.push({ id: newId, type: currentMode, sourceId: window.selectedPointIds[0], targetId: pId, color: window.activeColor, style: 'solid', arrow: 'none', label: "", labelPos: 'above', offset: currentMode === 'curve' ? 1 : undefined });
-            window.selectedPointIds = []; window.selectedEdgeIds = [newId]; window.selectedTextIds = [];
-            saveState(); if (window.updatePropertyPanel) window.updatePropertyPanel();
+            window.selectedPointIds = []; window.selectedEdgeIds = [newId]; window.selectedTextIds = []; window.selectedRegionIds = []; saveState(); if (window.updatePropertyPanel) window.updatePropertyPanel();
         }
     } 
     else if (currentMode === 'circle' && pId !== null) {
         let newId = window.edgeIdCounter++;
         window.edges.push({ id: newId, type: 'circle', sourceId: pId, radius: 1, color: window.activeColor, style: 'solid', label: "", labelPos: 'above' });
-        window.selectedEdgeIds = [newId]; window.selectedPointIds = []; window.selectedTextIds = [];
-        saveState(); if (window.updatePropertyPanel) window.updatePropertyPanel();
+        window.selectedEdgeIds = [newId]; window.selectedPointIds = []; window.selectedTextIds = []; window.selectedRegionIds = []; saveState(); if (window.updatePropertyPanel) window.updatePropertyPanel();
     }
     else if (currentMode === 'arc' && pId !== null) {
         let newId = window.edgeIdCounter++;
         window.edges.push({ id: newId, type: 'arc', sourceId: pId, radius: 2, startAngle: 0, endAngle: 90, color: window.activeColor, style: 'solid', arrow: 'none', label: "", labelPos: 'above' });
-        window.selectedEdgeIds = [newId]; window.selectedPointIds = []; window.selectedTextIds = [];
-        saveState(); if (window.updatePropertyPanel) window.updatePropertyPanel();
+        window.selectedEdgeIds = [newId]; window.selectedPointIds = []; window.selectedTextIds = []; window.selectedRegionIds = []; saveState(); if (window.updatePropertyPanel) window.updatePropertyPanel();
     } 
     else if (currentMode === 'elliptic-arc' && pId !== null) {
-        if (window.selectedPointIds.length === 0) {
-            window.selectedPointIds = [pId]; window.selectedEdgeIds = []; window.selectedTextIds = [];
-            if (window.updatePropertyPanel) window.updatePropertyPanel();
-        }
+        if (window.selectedPointIds.length === 0) { window.selectedPointIds = [pId]; window.selectedEdgeIds = []; window.selectedTextIds = []; window.selectedRegionIds = []; if (window.updatePropertyPanel) window.updatePropertyPanel(); }
         else if (window.selectedPointIds[0] !== pId) {
             let p1 = window.points.find(p=>p.id===window.selectedPointIds[0]); let p2 = window.points.find(p=>p.id===pId);
             let c = Math.hypot(p2.x-p1.x, p2.y-p1.y)/2; let newId = window.edgeIdCounter++;
             window.edges.push({ id: newId, type: 'elliptic-arc', sourceId: window.selectedPointIds[0], targetId: pId, radius: Math.ceil(c+1), startAngle: 0, endAngle: 180, color: window.activeColor, style: 'solid', arrow: 'none', label: "", labelPos: 'above' });
-            window.selectedPointIds = []; window.selectedEdgeIds = [newId]; window.selectedTextIds = [];
-            saveState(); if (window.updatePropertyPanel) window.updatePropertyPanel();
+            window.selectedPointIds = []; window.selectedEdgeIds = [newId]; window.selectedTextIds = []; window.selectedRegionIds = []; saveState(); if (window.updatePropertyPanel) window.updatePropertyPanel();
         }
     }
     draw();
@@ -410,9 +407,12 @@ canvas.addEventListener('mousemove', (e) => {
     
     if (isPanning) {
         originX += (mx - lastPanX); originY += (my - lastPanY); lastPanX = mx; lastPanY = my; draw();
+    } else if (isDrawingRegion && draggedRegionId !== null) {
+        let m = screenToMath(mx, my, true);
+        let r = window.regions.find(reg => reg.id === draggedRegionId);
+        if (r) { r.maxX = m.x; r.maxY = m.y; draw(); }
     } else if (isDragging) {
         let currMath = screenToMath(mx, my, false); 
-        
         if (draggedPointId !== null && window.selectedPointIds.length > 0) { 
             let dx = currMath.x - lastDragMath.x; let dy = currMath.y - lastDragMath.y;
             if (dx !== 0 || dy !== 0) {
@@ -427,29 +427,41 @@ canvas.addEventListener('mousemove', (e) => {
                 lastDragMath = currMath; draw();
             }
         }
+        else if (draggedRegionId !== null && window.selectedRegionIds.length > 0) {
+            let dx = currMath.x - lastDragMath.x; let dy = currMath.y - lastDragMath.y;
+            if (dx !== 0 || dy !== 0) {
+                window.selectedRegionIds.forEach(id => { let r = window.regions.find(r => r.id === id); if(r) { r.minX += dx; r.maxX += dx; r.minY += dy; r.maxY += dy; } });
+                lastDragMath = currMath; draw();
+            }
+        }
     }
 });
 
 window.addEventListener('mouseup', () => { 
     if (isDragging) saveState(); 
-    isPanning = false; isDragging = false; draggedPointId = null; draggedTextId = null; activeSnapLineX = null; activeSnapLineY = null; lastDragMath = null;
-    if (currentMode === 'move') canvas.style.cursor = 'grab';
-    else if (currentMode === 'select') canvas.style.cursor = 'pointer';
+    if (isDrawingRegion && draggedRegionId !== null) {
+        let r = window.regions.find(reg => reg.id === draggedRegionId);
+        if (r) {
+            let tempX1 = Math.min(r.minX, r.maxX); let tempX2 = Math.max(r.minX, r.maxX);
+            let tempY1 = Math.min(r.minY, r.maxY); let tempY2 = Math.max(r.minY, r.maxY);
+            r.minX = tempX1; r.maxX = tempX2; r.minY = tempY1; r.maxY = tempY2;
+            if (r.maxX - r.minX < 0.2 && r.maxY - r.minY < 0.2) { window.regions = window.regions.filter(reg => reg.id !== r.id); } 
+            else { window.selectedRegionIds = [r.id]; setMode('select', true); saveState(); }
+        }
+    }
+    isPanning = false; isDragging = false; isDrawingRegion = false; draggedPointId = null; draggedTextId = null; draggedRegionId = null; activeSnapLineX = null; activeSnapLineY = null; lastDragMath = null;
+    if (currentMode === 'move') canvas.style.cursor = 'grab'; else if (currentMode === 'select') canvas.style.cursor = 'pointer';
     draw(); 
 });
 
 window.addEventListener('keydown', (e) => {
     if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
-    
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') { 
         e.preventDefault(); 
-        window.selectedPointIds = window.points.map(p => p.id);
-        window.selectedEdgeIds = window.edges.map(ed => ed.id);
-        window.selectedTextIds = window.texts.map(t => t.id);
-        window.setMode('select', true);
-        return; 
+        window.selectedPointIds = window.points.map(p => p.id); window.selectedEdgeIds = window.edges.map(ed => ed.id);
+        window.selectedTextIds = window.texts.map(t => t.id); window.selectedRegionIds = window.regions.map(r => r.id);
+        window.setMode('select', true); return; 
     }
-    
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); window.undo(); return; }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') { e.preventDefault(); window.redo(); return; }
     if (e.key === 'Delete' || e.key === 'Backspace') { window.deleteSelected(); }
@@ -464,7 +476,6 @@ function drawArrowhead(ctx, x, y, angle, color) {
 window.draw = function() {
     ctx.clearRect(0, 0, canvasWidth, canvasHeight);
     let u = getUnitSize();
-
     document.querySelectorAll('.math-overlay').forEach(el => el.remove());
 
     if (document.getElementById('toggle-grid').checked) {
@@ -485,6 +496,21 @@ window.draw = function() {
     ctx.strokeStyle = '#ccc'; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(originX, 0); ctx.lineTo(originX, canvasHeight); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(0, originY); ctx.lineTo(canvasWidth, originY); ctx.stroke();
+
+    window.regions.forEach(r => {
+        let s1 = mathToScreen(r.minX, r.maxY); let s2 = mathToScreen(r.maxX, r.minY);
+        let w = s2.x - s1.x; let h = s2.y - s1.y;
+        
+        ctx.fillStyle = window.getHexFromName(r.color) + '33'; 
+        ctx.beginPath(); 
+        if (ctx.roundRect) ctx.roundRect(s1.x, s1.y, w, h, 25); 
+        else ctx.rect(s1.x, s1.y, w, h); 
+        ctx.fill();
+
+        if (window.selectedRegionIds.includes(r.id)) {
+            ctx.strokeStyle = 'gold'; ctx.lineWidth = 3; ctx.setLineDash([8,8]); ctx.stroke(); ctx.setLineDash([]);
+        }
+    });
 
     window.edges.forEach(e => {
         let p1 = window.points.find(p => p.id === e.sourceId); if (!p1) return; let s1 = mathToScreen(p1.x, p1.y); 
@@ -528,22 +554,14 @@ window.draw = function() {
 
         if (e.label) {
             let oX = 0; let oY = 0;
-            if (e.labelPos === 'above') oY = -15; 
-            else if (e.labelPos === 'below') oY = 15;
-            else if (e.labelPos === 'left') oX = -20;
-            else if (e.labelPos === 'right') oX = 20;
-
+            if (e.labelPos === 'above') oY = -15; else if (e.labelPos === 'below') oY = 15; else if (e.labelPos === 'left') oX = -20; else if (e.labelPos === 'right') oX = 20;
             let overlay = document.createElement('div'); overlay.className = 'math-overlay';
             overlay.style.position = 'absolute'; overlay.style.left = (midX + oX) + 'px'; overlay.style.top = (midY + oY) + 'px';
             overlay.style.transform = 'translate(-50%, -50%)'; overlay.style.color = window.getHexFromName(e.color); 
-            
-            // "On Line" adds solid white background to cover the line
             overlay.style.backgroundColor = e.labelPos === 'on' ? '#ffffff' : 'rgba(255, 255, 255, 0.7)';
             overlay.style.padding = '2px 4px'; overlay.style.borderRadius = '4px';
             if (e.labelPos === 'on') overlay.style.border = '1px solid transparent';
-            
-            overlay.style.pointerEvents = 'none'; 
-            document.getElementById('canvas-container').appendChild(overlay);
+            overlay.style.pointerEvents = 'none'; document.getElementById('canvas-container').appendChild(overlay);
             try { katex.render(e.label, overlay); } catch(err) { overlay.innerText = e.label; }
         }
     });
@@ -577,18 +595,39 @@ window.draw = function() {
     if (window.generateCode) window.generateCode();
 };
 
+window.exportImage = async function() {
+    let oldGrid = document.getElementById('toggle-grid').checked;
+    document.getElementById('toggle-grid').checked = false;
+    let oldPoints = window.selectedPointIds; let oldEdges = window.selectedEdgeIds;
+    let oldTexts = window.selectedTextIds; let oldRegions = window.selectedRegionIds;
+    window.selectedPointIds = []; window.selectedEdgeIds = []; window.selectedTextIds = []; window.selectedRegionIds = [];
+    draw(); 
+
+    const container = document.getElementById('canvas-container');
+    const canvasImg = await html2canvas(container, { backgroundColor: null, scale: 2 });
+
+    document.getElementById('toggle-grid').checked = oldGrid;
+    window.selectedPointIds = oldPoints; window.selectedEdgeIds = oldEdges; 
+    window.selectedTextIds = oldTexts; window.selectedRegionIds = oldRegions;
+    draw();
+
+    const link = document.createElement('a'); link.download = 'graph_export.png';
+    link.href = canvasImg.toDataURL('image/png'); link.click();
+};
+
 window.exportJSON = function() {
     let a = document.createElement('a'); a.download = "graph_data.json";
-    a.href = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({points: window.points, edges: window.edges, texts: window.texts, originX, originY, zoom: window.zoom}, null, 2)); a.click();
+    a.href = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({points: window.points, edges: window.edges, texts: window.texts, regions: window.regions, originX, originY, zoom: window.zoom}, null, 2)); a.click();
 }
 window.importJSON = function(e) {
     let reader = new FileReader();
     reader.onload = function(ev) {
-        let obj = JSON.parse(ev.target.result); window.points = obj.points || []; window.edges = obj.edges || []; window.texts = obj.texts || [];
+        let obj = JSON.parse(ev.target.result); window.points = obj.points || []; window.edges = obj.edges || []; window.texts = obj.texts || []; window.regions = obj.regions || [];
         if (obj.originX !== undefined) originX = obj.originX; if (obj.originY !== undefined) originY = obj.originY; if (obj.zoom !== undefined) window.zoom = obj.zoom;
         window.pointIdCounter = window.points.length ? Math.max(...window.points.map(p=>p.id))+1 : 0; 
         window.edgeIdCounter = window.edges.length ? Math.max(...window.edges.map(e=>e.id))+1 : 0; 
         window.textIdCounter = window.texts.length ? Math.max(...window.texts.map(t=>t.id))+1 : 0;
+        window.regionIdCounter = window.regions.length ? Math.max(...window.regions.map(r=>r.id))+1 : 0;
         saveState(); draw();
     }; reader.readAsText(e.target.files[0]);
 }
