@@ -137,7 +137,8 @@ window.clearAll = function() {
 
 window.toggleMacroInputs = function() {
     let type = document.getElementById('macro-type').value;
-    document.getElementById('macro-m').style.display = (type === 'Km,n') ? 'inline-block' : 'none';
+    // Show the 'm' input for both Bipartite and Grid graphs
+    document.getElementById('macro-m').style.display = (type === 'Km,n' || type === 'Grid') ? 'inline-block' : 'none';
 };
 
 window.insertMacro = function() {
@@ -175,8 +176,71 @@ window.insertMacro = function() {
         for (let i = 0; i < m; i++) { let id = window.pointIdCounter++; setA.push(id); window.points.push({ id, x: cx - rBip, y: startYa - i*2, color: window.activeColor, style: 'solid', label: String(startLbl + i), labelAngle: 180 }); }
         for (let i = 0; i < n; i++) { let id = window.pointIdCounter++; setB.push(id); window.points.push({ id, x: cx + rBip, y: startYb - i*2, color: window.activeColor, style: 'solid', label: String(startLbl + m + i), labelAngle: 0 }); }
         for (let a of setA) for (let b of setB) window.edges.push({ id: window.edgeIdCounter++, type: 'line', sourceId: a, targetId: b, color: window.activeColor, style: 'solid', arrow: 'none', label: "", labelPos: 'above' });
+    } else if (type === 'Wn') {
+        // Wheel Graph: 1 center, (n-1) cycle
+        let centerId = window.pointIdCounter++;
+        window.points.push({ id: centerId, x: cx, y: cy, color: window.activeColor, style: 'solid', label: String(startLbl), labelAngle: 90 });
+        let rimNodes = Math.max(3, n - 1); // Enforce at least a triangle on the outside
+        for (let i = 0; i < rimNodes; i++) {
+            let angle = -Math.PI/2 + (i * 2 * Math.PI) / rimNodes; 
+            let deg = Math.round((-angle * 180 / Math.PI + 360) % 360); 
+            let rimId = window.pointIdCounter++;
+            window.points.push({ id: rimId, x: cx + r * Math.cos(angle), y: cy - r * Math.sin(angle), color: window.activeColor, style: 'solid', label: String(startLbl + 1 + i), labelAngle: deg });
+            newPts.push(rimId);
+            // Spoke edge
+            window.edges.push({ id: window.edgeIdCounter++, type: 'line', sourceId: centerId, targetId: rimId, color: window.activeColor, style: 'solid', arrow: 'none', label: "", labelPos: 'above' });
+        }
+        // Rim edge (cycle)
+        for (let i = 0; i < rimNodes; i++) {
+            window.edges.push({ id: window.edgeIdCounter++, type: 'line', sourceId: newPts[i], targetId: newPts[(i+1)%rimNodes], color: window.activeColor, style: 'solid', arrow: 'none', label: "", labelPos: 'above' });
+        }
+        
+    } else if (type === 'Grid') {
+        // Grid Graph (m cols x n rows)
+        let gridNodes = [];
+        let startX = cx - ((m-1) * 2) / 2;
+        let startY = cy + ((n-1) * 2) / 2;
+        for (let j = 0; j < n; j++) { // Rows
+            let row = [];
+            for (let i = 0; i < m; i++) { // Cols
+                let id = window.pointIdCounter++;
+                window.points.push({ id, x: startX + i*2, y: startY - j*2, color: window.activeColor, style: 'solid', label: String(startLbl + j*m + i), labelAngle: 90 });
+                row.push(id);
+                // Connect to left neighbor
+                if (i > 0) window.edges.push({ id: window.edgeIdCounter++, type: 'line', sourceId: row[i-1], targetId: id, color: window.activeColor, style: 'solid', arrow: 'none', label: "", labelPos: 'above' });
+                // Connect to top neighbor
+                if (j > 0) window.edges.push({ id: window.edgeIdCounter++, type: 'line', sourceId: gridNodes[j-1][i], targetId: id, color: window.activeColor, style: 'solid', arrow: 'none', label: "", labelPos: 'above' });
+            }
+            gridNodes.push(row);
+        }
+
+    } else if (type === 'Q3') {
+        // 3D Hypercube Projection (Ignores 'n' input, fixed geometry)
+        let offset = 1.5; // Depth projection offset
+        let s = 3; // Cube size
+        let pts = [
+            {x: cx - s/2, y: cy - s/2}, {x: cx + s/2, y: cy - s/2}, // Front bottom
+            {x: cx + s/2, y: cy + s/2}, {x: cx - s/2, y: cy + s/2}, // Front top
+            {x: cx - s/2 + offset, y: cy - s/2 + offset}, {x: cx + s/2 + offset, y: cy - s/2 + offset}, // Back bottom
+            {x: cx + s/2 + offset, y: cy + s/2 + offset}, {x: cx - s/2 + offset, y: cy + s/2 + offset}  // Back top
+        ];
+        pts.forEach((p, i) => {
+            let id = window.pointIdCounter++;
+            window.points.push({ id, x: p.x, y: p.y, color: window.activeColor, style: 'solid', label: String(startLbl + i), labelAngle: 90 });
+            newPts.push(id);
+        });
+        // Edges
+        let edges = [
+            [0,1], [1,2], [2,3], [3,0], // Front face
+            [4,5], [5,6], [6,7], [7,4], // Back face
+            [0,4], [1,5], [2,6], [3,7]  // Connecting depth edges
+        ];
+        edges.forEach(pair => {
+            window.edges.push({ id: window.edgeIdCounter++, type: 'line', sourceId: newPts[pair[0]], targetId: newPts[pair[1]], color: window.activeColor, style: 'solid', arrow: 'none', label: "", labelPos: 'above' });
+        });
     }
-    saveState(); window.setMode('select'); 
+
+    saveState(); window.setMode('select');
 };
 
 function updatePropertyPanel() {
