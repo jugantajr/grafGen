@@ -14,10 +14,15 @@
         <div class="toolbar-row">
             <div class="tool-group">
                 <button onclick="undo()" title="Undo (Ctrl+Z)" class="icon-btn"><span class="material-symbols-outlined">undo</span></button>
+
                 <button onclick="redo()" title="Redo (Ctrl+Y)" class="icon-btn"><span class="material-symbols-outlined">redo</span></button>
+
                 <button onclick="toggleLayout()" title="Switch layout for mobile" class="icon-btn" style="background: #343a40; color: white;"><span class="material-symbols-outlined">swap_vert</span></button>
-                <button onclick="clearAll()" class="danger icon-btn" title="Clear entire canvas"><span class="material-symbols-outlined">delete_sweep</span></button>
+
+                <button onclick="clearAll()" title="Clear entire canvas" class="danger icon-btn"  style="background: #ff0101; color: white;"><span class="material-symbols-outlined">delete_sweep</span></button>
+
                 <button onclick="openInstructions()" title="View Instructions" class="icon-btn" style="background: #17a2b8; color: white; border-color: #117a8b; margin-left: 5px;"><span class="material-symbols-outlined">help</span></button>
+                
             </div>
             <div class="tool-group">
                 <button onclick="zoomIn()" title="Zoom In (+)" class="icon-btn"><span class="material-symbols-outlined">zoom_in</span></button>
@@ -27,17 +32,48 @@
             </div>
             <div class="tool-group">
                 <strong>Tools:</strong>
-                <button id="mode-point" class="active" onclick="setMode('point')" title="Click canvas to drop points">Point</button>
-                <button id="mode-line" onclick="setMode('line')" title="Connect two points">Line</button>
-                <button id="mode-curve" onclick="setMode('curve')" title="Click two points to draw a curved line">Curve</button>
-                <button id="mode-circle" onclick="setMode('circle')" title="Click 1 point (center) for circle">Circle</button>
-                <button id="mode-arc" onclick="setMode('arc')" title="Click 1 point for arc">Arc</button>
-                <button id="mode-elliptic-arc" onclick="setMode('elliptic-arc')" title="Click 2 points (foci) for ellipse">Elliptic Arc</button>
-                <button id="mode-text" onclick="setMode('text')" title="Add LaTeX math text">Text</button>
+    
+                <button id="mode-point" class="active icon-btn" onclick="setMode('point')" title="Point: Click canvas to drop points">
+                    <span class="material-symbols-outlined">radio_button_checked</span>
+                </button>
+    
+                <button id="mode-line" class="icon-btn" onclick="setMode('line')" title="Line: Connect two points">
+                    <span class="material-symbols-outlined">timeline</span>
+                </button>
+    
+                <button id="mode-curve" class="icon-btn" onclick="setMode('curve')" title="Curve: Click two points to draw a curved line">
+                    <span class="material-symbols-outlined">gesture</span>
+                </button>
+    
+                <button id="mode-circle" class="icon-btn" onclick="setMode('circle')" title="Circle: Click 1 point (center) for circle">
+                    <span class="material-symbols-outlined">radio_button_unchecked</span>
+                </button>
+    
+                <button id="mode-arc" class="icon-btn" onclick="setMode('arc')" title="Arc: Click 1 point for arc">
+                    <span class="material-symbols-outlined">incomplete_circle</span>
+                </button>
+    
+                <button id="mode-elliptic-arc" class="icon-btn" onclick="setMode('elliptic-arc')" title="Elliptic Arc: Click 2 points (foci) for ellipse">
+                    <span class="material-symbols-outlined">toll</span>
+                </button>
+    
+                <button id="mode-text" class="icon-btn" onclick="setMode('text')" title="Free Text: Add LaTeX math text" >
+                    <span class="material-symbols-outlined">text_fields</span>
+                </button>
+    
                 <div class="divider"></div>
-                <button id="mode-select" onclick="setMode('select')" title="Select items (Shift+Click for multi-select)">Select</button>
-                <button id="mode-move" onclick="setMode('move')" title="Drag items or pan canvas">Move</button>
-                <button id="mode-delete" onclick="setMode('delete')" title="Click item to delete" style="margin-left: 5px;"><span class="material-symbols-outlined">delete</span></button>
+    
+                <button id="mode-select" class="icon-btn" onclick="setMode('select')" title="Select: Select items (Shift+Click for multi-select)" style="color: #007bff;">
+                    <span class="material-symbols-outlined" >arrow_selector_tool</span>
+                </button>
+    
+                <button id="mode-move" class="icon-btn" onclick="setMode('move')" title="Move: Drag items or pan canvas" style="color: #007bff;">
+                    <span class="material-symbols-outlined">pan_tool</span>
+                </button>
+    
+                <button id="mode-delete" class="icon-btn" onclick="setMode('delete')" title="Eraser: Click item to delete" style="color: #dc3545;">
+                    <span class="material-symbols-outlined">ink_eraser</span>
+                </button>
             </div>
 
             
@@ -77,8 +113,6 @@
                             <div class="select-items select-hide" id="color-list"></div>
                         </div>
                     </div>
-
-                    <button id="prop-delete-btn" class="danger" onclick="deleteSelected()" title="Delete selected item(s)" style="margin-left: 5px;">🗑️</button>
                 </div>
             </div>
 
@@ -124,35 +158,54 @@
     </div>
 
     <div id="instructions-modal" class="modal">
-        <div class="modal-content">
+        <div class="modal-content" style="max-width: 750px;">
             <span class="close-btn" onclick="closeInstructions()">&times;</span>
-            <h2 style="margin-top: 0; color: #0056b3;">Pro Graph Code Builder</h2>
-            <p>A precision mathematics IDE designed specifically for graph theory, matrix analysis, and academic publishing. Visually construct complex graphs and instantly generate publication-ready LaTeX code in both <b>TikZ</b> and <b>PSTricks</b> formats.</p>
+            <h2 style="margin-top: 0; color: #0056b3; display: flex; align-items: center; gap: 8px;">
+                <span class="material-symbols-outlined" style="font-size: 28px;">timeline</span>
+                Pro Graph Code Builder
+            </h2>
+            <p>A precision mathematics IDE designed specifically for graph theory, matrix analysis, and academic publishing. Visually construct complex graphs and instantly generate publication-ready LaTeX code.</p>
             
             <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
             
-            <h3 style="color: #333;">⌨️ Keyboard Shortcuts</h3>
-            <ul style="line-height: 1.6;">
-                <li><b><code>Shift</code> + <code>Click</code></b>: Select multiple items at once to edit or move them together.</li>
-                <li><b><code>Ctrl</code> + <code>A</code></b> (or Cmd+A): Select all elements on the canvas.</li>
-                <li><b><code>Ctrl</code> + <code>Z</code></b> / <b><code>Ctrl</code> + <code>Y</code></b>: Undo and Redo.</li>
-                <li><b><code>Delete</code></b> or <b><code>Backspace</code></b>: Erase selected items.</li>
-            </ul>
+            <div style="display: flex; flex-wrap: wrap; gap: 20px;">
+                
+                <div style="flex: 1; min-width: 300px;">
+                    <h3 style="color: #333; margin-bottom: 10px;">🛠️ Drawing Tools</h3>
+                    <ul style="line-height: 1.8; list-style: none; padding-left: 0; margin-top: 0;">
+                        <li><span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 5px; color: #555;">radio_button_checked</span> <b>Point:</b> Click the canvas to drop nodes.</li>
+                        <li><span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 5px; color: #555;">timeline</span> <b>Line:</b> Click two points sequentially to connect them.</li>
+                        <li><span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 5px; color: #555;">gesture</span> <b>Curve:</b> Click two points to draw a bezier curve (adjust offset in Properties).</li>
+                        <li><span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 5px; color: #555;">radio_button_unchecked</span> <b>Circle:</b> Click one point to create a circle centered around it.</li>
+                        <li><span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 5px; color: #555;">incomplete_circle</span> <b>Arc:</b> Click one point to create an open arc.</li>
+                        <li><span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 5px; color: #555;">toll</span> <b>Elliptic Arc:</b> Click two points to set the foci of an ellipse.</li>
+                        <li><span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 5px; color: #555;">text_fields</span> <b>Free Text:</b> Click anywhere to add a floating LaTeX math label.</li>
+                    </ul>
+                    <p style="font-size: 12px; color: #666; font-style: italic;">* Drawing tools are continuous. You can click rapidly to build large networks without re-selecting the tool.</p>
+                </div>
 
-            <h3 style="color: #333;">✨ Key Features</h3>
-            <ul style="line-height: 1.6;">
-                <li><b>Live LaTeX Rendering:</b> All text and node labels automatically render standard LaTeX math (e.g., <code>\lambda_{max}</code>) on the canvas.</li>
-                <li><b>Graph Macros:</b> Instantly generate perfectly symmetrical Complete Graphs, Cycles, Paths, Stars, and Bipartite Graphs via the Macros toolbar.</li>
-                <li><b>Precision Snapping:</b> Vertices snap to grid intersections or align automatically with other nodes while dragging.</li>
-                <li><b>Smart Edges:</b> Draw lines, circles, arcs, and bezier curves (perfect for parallel edges and self-loops). Set labels to break the line dynamically using the "On Line" position.</li>
-            </ul>
+                <div style="flex: 1; min-width: 300px;">
+                    <h3 style="color: #333; margin-bottom: 10px;">🖱️ Actions & System</h3>
+                    <ul style="line-height: 1.8; list-style: none; padding-left: 0; margin-top: 0;">
+                        <li><span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 5px; color: #007bff;">arrow_selector_tool</span> <b>Select:</b> Click items to edit properties. <b>Hold Shift</b> to select multiple items.</li>
+                        <li><span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 5px; color: #007bff;">pan_tool</span> <b>Move:</b> Drag items or drag empty canvas space to pan.</li>
+                        <li><span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 5px; color: #dc3545;">ink_eraser</span> <b>Eraser:</b> Click any item to instantly delete it.</li>
+                        <li><span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 5px; color: #555;">undo</span> / <span class="material-symbols-outlined" style="vertical-align: middle; color: #555;">redo</span> <b>Undo & Redo:</b> Step backward or forward.</li>
+                        <li><span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 5px; color: #555;">swap_vert</span> <b>Layout:</b> Toggle vertical/horizontal panel split.</li>
+                        <li><span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 5px; color: #dc3545;">delete_sweep</span> <b>Clear All:</b> Wipe the entire canvas.</li>
+                    </ul>
 
-            <h3 style="color: #333;">🖱️ How to Use</h3>
-            <ol style="line-height: 1.6;">
-                <li><b>Draw:</b> Select a drawing tool (Point, Line, Curve) and click the canvas. The tools are continuous, so you can rapidly build networks.</li>
-                <li><b>Edit:</b> Switch to the `Select` tool (Arrow) and click any item to reveal its specific inputs in the Properties Panel.</li>
-                <li><b>Export:</b> The right panel automatically updates with your LaTeX code. Select TikZ or PSTricks, copy, and paste directly into your document!</li>
-            </ol>
+                    <h3 style="color: #333; margin-bottom: 10px; margin-top: 20px;">⌨️ Keyboard Shortcuts</h3>
+                    <ul style="line-height: 1.6; list-style-type: square; padding-left: 20px; margin-top: 0;">
+                        <li><b><code>Ctrl</code> + <code>A</code></b>: Select all elements.</li>
+                        <li><b><code>Ctrl</code> + <code>Z</code></b> / <b><code>Y</code></b>: Undo / Redo.</li>
+                        <li><b><code>Delete</code></b>: Erase currently selected items.</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
+            <p style="font-size: 13px; color: #555;"><b>💡 Pro Tip for LaTeX Labels:</b> To break a line with an edge label, select the edge, and in the Properties Panel set the <b>Pos:</b> dropdown to <b>"On Line"</b>.</p>
         </div>
     </div>
 
