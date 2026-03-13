@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pro Graph Code Builder</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20,400,0,0" />
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
     <link rel="stylesheet" href="css/style.css">
 </head>
@@ -12,13 +13,18 @@
     <div id="toolbar">
         <div class="toolbar-row">
             <div class="tool-group">
-                <button onclick="undo()" title="Undo (Ctrl+Z)">↩️</button>
-                <button onclick="redo()" title="Redo (Ctrl+Y)">↪️</button>
-                <button onclick="toggleLayout()" title="Switch layout for mobile devices" style="font-weight: bold; background: #343a40; color: white;">↕️ Layout</button>
-                <button onclick="clearAll()" class="danger" title="Clear entire canvas">Clear All</button>
-                <button onclick="openInstructions()" title="View Instructions" style="font-weight: bold; background: #17a2b8; color: white; border-color: #117a8b; margin-left: 5px;">ℹ️ Help</button>
+                <button onclick="undo()" title="Undo (Ctrl+Z)" class="icon-btn"><span class="material-symbols-outlined">undo</span></button>
+                <button onclick="redo()" title="Redo (Ctrl+Y)" class="icon-btn"><span class="material-symbols-outlined">redo</span></button>
+                <button onclick="toggleLayout()" title="Switch layout for mobile" class="icon-btn" style="background: #343a40; color: white;"><span class="material-symbols-outlined">swap_vert</span></button>
+                <button onclick="clearAll()" class="danger icon-btn" title="Clear entire canvas"><span class="material-symbols-outlined">delete_sweep</span></button>
+                <button onclick="openInstructions()" title="View Instructions" class="icon-btn" style="background: #17a2b8; color: white; border-color: #117a8b; margin-left: 5px;"><span class="material-symbols-outlined">help</span></button>
             </div>
-
+            <div class="tool-group">
+                <button onclick="zoomIn()" title="Zoom In (+)" class="icon-btn"><span class="material-symbols-outlined">zoom_in</span></button>
+                <button onclick="zoomOut()" title="Zoom Out (-)" class="icon-btn"><span class="material-symbols-outlined">zoom_out</span></button>
+                <label title="Show/hide grid"><input type="checkbox" id="toggle-grid" checked onchange="draw()"> Grid</label>
+                <label title="Snap to grid intersections"><input type="checkbox" id="snap-grid" checked> Snap</label>
+            </div>
             <div class="tool-group">
                 <strong>Tools:</strong>
                 <button id="mode-point" class="active" onclick="setMode('point')" title="Click canvas to drop points">Point</button>
@@ -27,19 +33,14 @@
                 <button id="mode-circle" onclick="setMode('circle')" title="Click 1 point (center) for circle">Circle</button>
                 <button id="mode-arc" onclick="setMode('arc')" title="Click 1 point for arc">Arc</button>
                 <button id="mode-elliptic-arc" onclick="setMode('elliptic-arc')" title="Click 2 points (foci) for ellipse">Elliptic Arc</button>
-                <button id="mode-text" onclick="setMode('text')" title="Add LaTeX math text">Free Text</button>
+                <button id="mode-text" onclick="setMode('text')" title="Add LaTeX math text">Text</button>
                 <div class="divider"></div>
                 <button id="mode-select" onclick="setMode('select')" title="Select items (Shift+Click for multi-select)">Select</button>
                 <button id="mode-move" onclick="setMode('move')" title="Drag items or pan canvas">Move</button>
-                <button id="mode-delete" onclick="setMode('delete')" title="Click item to delete">Eraser</button>
+                <button id="mode-delete" onclick="setMode('delete')" title="Click item to delete" style="margin-left: 5px;"><span class="material-symbols-outlined">delete</span></button>
             </div>
 
-            <div class="tool-group">
-                <button onclick="zoomIn()" title="Zoom in (+)">Zoom +</button>
-                <button onclick="zoomOut()" title="Zoom out (-)">Zoom -</button>
-                <label title="Show/hide grid"><input type="checkbox" id="toggle-grid" checked onchange="draw()"> Grid</label>
-                <label title="Snap to grid intersections"><input type="checkbox" id="snap-grid" checked> Snap</label>
-            </div>
+            
         </div>
 
         <div class="toolbar-row">

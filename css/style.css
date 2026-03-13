@@ -97,3 +97,14 @@ textarea { flex: 1; width: 100%; font-family: monospace; font-size: 13px; paddin
     color: #d9534f;
     text-decoration: none;
 }
+
+button.icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 6px;
+}
+
+button.icon-btn .material-symbols-outlined {
+    font-size: 18px; /* Control the exact size of the icons here */
+}
