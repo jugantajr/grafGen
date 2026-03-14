@@ -32,6 +32,9 @@ jobs:
           npx terser js/generators.js -o js/generators.js -c -m
           npx terser js/matrix.js -o js/matrix.js -c -m
           npx terser js/python.js -o js/python.js -c -m
+          npx terser js/sage.js -o js/sage.js -c -m
+          npx terser js/mathematica.js -o js/mathematica.js -c -m  # ADD
+          npx terser js/matlab.js -o js/matlab.js -c -m            # ADD
           npx terser js/canvas.js -o js/canvas.js -c -m
           npx clean-css-cli -o css/style.css css/style.css
 

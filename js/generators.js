@@ -59,7 +59,23 @@ window.generateCode = function() {
         out.value = window.generatePythonNetworkX();
         return;
     }
+
+    if (format === 'sage') {
+        out.value = window.generateSageMath();
+        return;
+    }
     
+    if (format === 'mathematica') {
+        out.value = window.generateMathematica();
+        return;
+    }
+
+    // NEW: Intercept MATLAB
+    if (format === 'matlab') {
+        out.value = window.generateMATLAB();
+        return;
+    }
+
     let b = getBounds(); let latex = "";
     
     if (format === 'pstricks') {

@@ -138,11 +138,14 @@
                     <button onclick="exportJSON()" title="Save graph project">Save JSON</button>
                     <button onclick="document.getElementById('file-import').click()" title="Load graph project">Load JSON</button>
                     <input type="file" id="file-import" style="display: none;" accept=".json" onchange="importJSON(event)">
-                    <select id="code-format" onchange="draw()" title="Choose output LaTeX format">
+                    <select id="code-format" onchange="draw()" title="Choose output format">
                         <option value="pstricks">PSTricks</option>
                         <option value="tikz">TikZ</option>
                         <option value="matrix">Matrices (A, D, L)</option>
                         <option value="python">Python (NetworkX)</option>
+                        <option value="sage">SageMath</option>
+                        <option value="mathematica">Mathematica</option>
+                        <option value="matlab">MATLAB</option>
                     </select>
                 </div>
             </div>
@@ -238,6 +241,9 @@
     <script src="js/generators.js"></script>
     <script src="js/matrix.js"></script>
     <script src="js/python.js"></script>
+    <script src="js/sage.js"></script>
+    <script src="js/mathematica.js"></script>
+    <script src="js/matlab.js"></script>
     <script src="js/canvas.js"></script>
 </body>
 </html>
