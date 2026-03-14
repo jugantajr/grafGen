@@ -25,18 +25,18 @@ jobs:
         with:
           node-version: '20'
 
-      # 4. The bot minifies all your specific CSS and JS files in place
+      # 4. The bot minifies all your specific CSS and JS files in place (-y auto-accepts the install)
       - name: Minify JavaScript and CSS
         run: |
-          npx terser js/ui.js -o js/ui.js -c -m
-          npx terser js/generators.js -o js/generators.js -c -m
-          npx terser js/matrix.js -o js/matrix.js -c -m
-          npx terser js/python.js -o js/python.js -c -m
-          npx terser js/sage.js -o js/sage.js -c -m
-          npx terser js/mathematica.js -o js/mathematica.js -c -m  # ADD
-          npx terser js/matlab.js -o js/matlab.js -c -m            # ADD
-          npx terser js/canvas.js -o js/canvas.js -c -m
-          npx clean-css-cli -o css/style.css css/style.css
+          npx -y terser js/ui.js -o js/ui.js -c -m
+          npx -y terser js/generators.js -o js/generators.js -c -m
+          npx -y terser js/matrix.js -o js/matrix.js -c -m
+          npx -y terser js/python.js -o js/python.js -c -m
+          npx -y terser js/sage.js -o js/sage.js -c -m
+          npx -y terser js/mathematica.js -o js/mathematica.js -c -m
+          npx -y terser js/matlab.js -o js/matlab.js -c -m
+          npx -y terser js/canvas.js -o js/canvas.js -c -m
+          npx -y clean-css-cli -o css/style.css css/style.css
 
       # 5. The bot creates the release branch, commits the crushed files, and force pushes it
       - name: Force push to release branch
@@ -44,5 +44,7 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -b release
-          git commit -am "🚀 Auto-minified production release"
+          
+          # The '|| echo' prevents a crash if you only updated the README and the JS didn't change
+          git commit -am "🚀 Auto-minified production release" || echo "No changes to commit"
           git push -f origin release
