@@ -74,10 +74,18 @@ window.generateCode = function() {
         }
 
         window.points.forEach((p) => {
-            let fill = p.style === 'solid' ? `fillstyle=solid, fillcolor=${p.color}` : `fillstyle=solid, fillcolor=white`;
+            let r = p.radius !== undefined ? p.radius : 5;
             let ang = p.labelAngle !== undefined ? p.labelAngle : 90;
             let lbl = p.label !== "" ? ` \\uput[${ang}](${p.x},${p.y}){ $${p.label}$}` : "";
-            latex += `    \\cnode[${fill}, linecolor=${p.color}](${p.x},${p.y}){\\r}{n${p.id}}${lbl}\n`;
+            
+            if (r > 0) {
+                // Dynamically scale the radius size for PSTricks
+                let fill = p.style === 'solid' ? `fillstyle=solid, fillcolor=${p.color}` : `fillstyle=solid, fillcolor=white`;
+                latex += `    \\cnode[${fill}, linecolor=${p.color}](${p.x},${p.y}){${(r/25).toFixed(2)}}{n${p.id}}${lbl}\n`;
+            } else {
+                // Invisible Node
+                latex += `    \\pnode(${p.x},${p.y}){n${p.id}}${lbl}\n`;
+            }
         });
         latex += `\n`;
         
@@ -136,9 +144,19 @@ window.generateCode = function() {
         }
 
         window.points.forEach((p) => {
-            let fill = p.style === 'solid' ? p.color : 'white'; let ang = p.labelAngle !== undefined ? p.labelAngle : 90;
-            let lbl = p.label !== "" ? `, label={${ang}: $${p.label}$}` : '';
-            latex += `    \\node[circle, draw=${p.color}, fill=${fill}, inner sep=1.5pt${lbl}] (n${p.id}) at (${p.x},${p.y}) {};\n`;
+            let r = p.radius !== undefined ? p.radius : 5;
+            let ang = p.labelAngle !== undefined ? p.labelAngle : 90;
+            
+            if (r > 0) {
+                // Dynamically scale the inner sep for TikZ
+                let fill = p.style === 'solid' ? p.color : 'white'; 
+                let lbl = p.label !== "" ? `, label={${ang}: $${p.label}$}` : '';
+                latex += `    \\node[circle, draw=${p.color}, fill=${fill}, inner sep=${r/2}pt${lbl}] (n${p.id}) at (${p.x},${p.y}) {};\n`;
+            } else {
+                // Invisible Coordinate
+                let lbl = p.label !== "" ? `[label={${ang}: $${p.label}$}]` : '';
+                latex += `    \\coordinate${lbl} (n${p.id}) at (${p.x},${p.y});\n`;
+            }
         });
         latex += `\n`;
         

@@ -379,6 +379,12 @@ function updatePropertyPanel() {
         let p = window.points.find(p => p.id === window.selectedPointIds[0]); if(!p) return;
         document.getElementById('wrap-label').style.display = 'flex'; document.getElementById('prop-label').value = p.label || "";
         document.getElementById('wrap-angle').style.display = 'flex'; document.getElementById('prop-label-angle').value = p.labelAngle !== undefined ? p.labelAngle : 90;
+        
+        // NEW: Show radius for points
+        document.getElementById('wrap-radius').style.display = 'flex'; 
+        document.getElementById('prop-radius').value = p.radius !== undefined ? p.radius : 5; 
+        document.getElementById('lbl-radius').innerText = "Radius:";
+        
         document.getElementById('wrap-p-style').style.display = 'flex'; document.getElementById('point-style').value = p.style;
         document.getElementById('current-color').innerHTML = `<span class="color-box" style="background: ${window.getHexFromName(p.color)};"></span> ${p.color}`;
     } else if (window.selectedEdgeIds.length > 0) {
@@ -437,7 +443,12 @@ canvas.addEventListener('mousedown', (e) => {
     }
 
     let pId = null, tId = null, eId = null, rId = null;
-    let pObj = window.points.find(p => Math.hypot(mathToScreen(p.x, p.y).x - mx, mathToScreen(p.x, p.y).y - my) < 15);
+    let pObj = window.points.find(p => {
+        let s = mathToScreen(p.x, p.y);
+        let r = p.radius !== undefined ? p.radius : 5;
+        let hitRadius = Math.max(r + 5, 15); // Ensures a minimum 15px invisible hitbox
+        return Math.hypot(s.x - mx, s.y - my) < hitRadius;
+    });
     if (pObj) pId = pObj.id;
 
     if (pId === null) {
@@ -767,9 +778,22 @@ window.draw = function() {
 
     window.points.forEach(p => {
         let s = mathToScreen(p.x, p.y);
-        ctx.fillStyle = p.style === 'solid' ? (window.selectedPointIds.includes(p.id) ? 'gold' : window.getHexFromName(p.color)) : 'white';
-        ctx.strokeStyle = window.selectedPointIds.includes(p.id) ? 'gold' : window.getHexFromName(p.color);
-        ctx.beginPath(); ctx.arc(s.x, s.y, 5, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+        let r = p.radius !== undefined ? p.radius : 5;
+        
+        // Only draw the physical node if radius is greater than 0
+        if (r > 0) {
+            ctx.fillStyle = p.style === 'solid' ? window.getHexFromName(p.color) : (isDark ? '#222' : 'white');
+            ctx.strokeStyle = window.getHexFromName(p.color);
+            ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.arc(s.x, s.y, r, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+        }
+
+        // ALWAYS draw the yellow highlight ring if selected, even if invisible
+        if (window.selectedPointIds.includes(p.id)) {
+            ctx.strokeStyle = 'rgba(255, 215, 0, 0.8)';
+            ctx.lineWidth = 3;
+            ctx.beginPath(); ctx.arc(s.x, s.y, r === 0 ? 5 : r + 4, 0, Math.PI*2); ctx.stroke();
+        }
 
         if (p.label) {
             let r = (p.labelAngle !== undefined ? p.labelAngle : 90) * Math.PI/180;
