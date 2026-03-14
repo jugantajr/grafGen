@@ -680,9 +680,11 @@ window.draw = function() {
         ctx.setLineDash([]);
     }
 
-    ctx.strokeStyle = isDark ? '#808080' : '#ccc'; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(originX, 0); ctx.lineTo(originX, canvasHeight); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(0, originY); ctx.lineTo(canvasWidth, originY); ctx.stroke();
+    if (document.getElementById('toggle-axes') && document.getElementById('toggle-axes').checked) {
+        ctx.strokeStyle = isDark ? '#808080' : '#ccc'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(originX, 0); ctx.lineTo(originX, canvasHeight); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, originY); ctx.lineTo(canvasWidth, originY); ctx.stroke();
+    }
 
     window.regions.forEach(r => {
         let s1 = mathToScreen(r.minX, r.maxY); let s2 = mathToScreen(r.maxX, r.minY);
@@ -794,16 +796,73 @@ window.draw = function() {
 };
 
 window.exportImage = async function() {
-    let oldGrid = document.getElementById('toggle-grid').checked; document.getElementById('toggle-grid').checked = false;
-    let oldPoints = window.selectedPointIds; let oldEdges = window.selectedEdgeIds; let oldTexts = window.selectedTextIds; let oldRegions = window.selectedRegionIds;
-    window.selectedPointIds = []; window.selectedEdgeIds = []; window.selectedTextIds = []; window.selectedRegionIds = [];
-    draw(); 
-    const container = document.getElementById('canvas-container');
-    const canvasImg = await html2canvas(container, { backgroundColor: null, scale: 2 });
-    document.getElementById('toggle-grid').checked = oldGrid;
-    window.selectedPointIds = oldPoints; window.selectedEdgeIds = oldEdges; window.selectedTextIds = oldTexts; window.selectedRegionIds = oldRegions;
-    draw();
-    const link = document.createElement('a'); link.download = 'graph_export.png'; link.href = canvasImg.toDataURL('image/png'); link.click();
+    // 1. Save current selection state and theme BEFORE the try block
+    let oldPoints = window.selectedPointIds; 
+    let oldEdges = window.selectedEdgeIds; 
+    let oldTexts = window.selectedTextIds; 
+    let oldRegions = window.selectedRegionIds;
+    let wasDark = document.body.classList.contains('dark-mode');
+
+    try {
+        // 2. Prepare canvas for clean photo
+        // (We hide the yellow selection highlights, but leave the grid exactly as it is!)
+        window.selectedPointIds = []; 
+        window.selectedEdgeIds = []; 
+        window.selectedTextIds = []; 
+        window.selectedRegionIds = [];
+        
+        if (wasDark) document.body.classList.remove('dark-mode');
+
+        draw(); 
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        const container = document.getElementById('canvas-container');
+        
+        // 3. Generate Image with a SOLID WHITE BACKGROUND
+        const canvasImg = await html2canvas(container, { 
+            backgroundColor: '#ffffff',
+            scale: 2,
+            useCORS: true, 
+            logging: false 
+        });
+
+        // 4. Trigger Download
+        const link = document.createElement('a'); 
+        link.download = 'ProGraph_Export.png'; 
+        link.href = canvasImg.toDataURL('image/png'); 
+        link.click();
+
+    } catch (error) {
+        console.error("Advanced export failed:", error);
+        
+        // FALLBACK: Create a temporary canvas, fill it with white, and draw the raw graph on top
+        const rawCanvas = document.getElementById('graphCanvas');
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = rawCanvas.width;
+        tempCanvas.height = rawCanvas.height;
+        const tCtx = tempCanvas.getContext('2d');
+        
+        // Fill white background for fallback
+        tCtx.fillStyle = '#ffffff';
+        tCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+        tCtx.drawImage(rawCanvas, 0, 0);
+
+        const link = document.createElement('a');
+        link.download = 'ProGraph_Raw_Export.png';
+        link.href = tempCanvas.toDataURL('image/png');
+        link.click();
+        
+    } finally {
+        // 5. ALWAYS RESTORE STATE (Even if the export failed)
+        if (wasDark) document.body.classList.add('dark-mode');
+        
+        // Restore your selections
+        window.selectedPointIds = oldPoints; 
+        window.selectedEdgeIds = oldEdges; 
+        window.selectedTextIds = oldTexts; 
+        window.selectedRegionIds = oldRegions;
+        draw();
+    }
 };
 
 window.exportJSON = function() {
