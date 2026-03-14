@@ -1,0 +1,45 @@
+name: Auto Minify and Release
+
+# 1. Tell GitHub to run this script ONLY when you push to main
+on:
+  push:
+    branches:
+      - main
+
+# Give the bot permission to push the new code
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 2. The bot downloads your main branch into its temporary server
+      - name: Checkout main branch
+        uses: actions/checkout@v4
+
+      # 3. The bot installs Node.js to run the minifiers
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # 4. The bot minifies all your specific CSS and JS files in place
+      - name: Minify JavaScript and CSS
+        run: |
+          npx terser js/ui.js -o js/ui.js -c -m
+          npx terser js/generators.js -o js/generators.js -c -m
+          npx terser js/matrix.js -o js/matrix.js -c -m
+          npx terser js/python.js -o js/python.js -c -m
+          npx terser js/canvas.js -o js/canvas.js -c -m
+          npx clean-css-cli -o css/style.css css/style.css
+
+      # 5. The bot creates the release branch, commits the crushed files, and force pushes it
+      - name: Force push to release branch
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b release
+          git commit -am "🚀 Auto-minified production release"
+          git push -f origin release
