@@ -714,21 +714,59 @@ window.draw = function() {
 
         if (e.type === 'line') {
             let p2 = window.points.find(p => p.id === e.targetId); if (!p2) return; let s2 = mathToScreen(p2.x, p2.y);
-            midX = (s1.x+s2.x)/2; midY = (s1.y+s2.y)/2; ctx.moveTo(s1.x, s1.y); ctx.lineTo(s2.x, s2.y); ctx.stroke();
-            let ang = Math.atan2(s2.y-s1.y, s2.x-s1.x);
-            if (['end','both'].includes(e.arrow)) drawArrowhead(ctx, s2.x-5*Math.cos(ang), s2.y-5*Math.sin(ang), ang, ctx.strokeStyle);
-            if (['start','both'].includes(e.arrow)) drawArrowhead(ctx, s1.x+5*Math.cos(ang), s1.y+5*Math.sin(ang), ang+Math.PI, ctx.strokeStyle);
+            
+            let r1 = p1.radius !== undefined ? p1.radius : 5;
+            let r2 = p2.radius !== undefined ? p2.radius : 5;
+            
+            let dx = s2.x - s1.x; let dy = s2.y - s1.y;
+            let len = Math.hypot(dx, dy);
+            
+            // Only draw if the nodes aren't completely overlapping
+            if (len > r1 + r2) {
+                let ang = Math.atan2(dy, dx);
+                
+                // Shorten the line so it starts and stops exactly at the border (+ 2px buffer)
+                let startX = s1.x + (r1 + 2) * Math.cos(ang);
+                let startY = s1.y + (r1 + 2) * Math.sin(ang);
+                let endX = s2.x - (r2 + 2) * Math.cos(ang);
+                let endY = s2.y - (r2 + 2) * Math.sin(ang);
+                
+                midX = (s1.x + s2.x) / 2; midY = (s1.y + s2.y) / 2; 
+                ctx.moveTo(startX, startY); ctx.lineTo(endX, endY); ctx.stroke();
+                
+                // Draw arrowheads exactly at the trimmed ends
+                if (['end','both'].includes(e.arrow)) drawArrowhead(ctx, endX, endY, ang, ctx.strokeStyle);
+                if (['start','both'].includes(e.arrow)) drawArrowhead(ctx, startX, startY, ang + Math.PI, ctx.strokeStyle);
+            }
+            
         } else if (e.type === 'curve') {
             let p2 = window.points.find(p => p.id === e.targetId); if (!p2) return; let s2 = mathToScreen(p2.x, p2.y);
+            
+            let r1 = p1.radius !== undefined ? p1.radius : 5;
+            let r2 = p2.radius !== undefined ? p2.radius : 5;
+            
             let d_screen = e.offset * u;
             let dx = s2.x - s1.x, dy = s2.y - s1.y; let len = Math.hypot(dx, dy);
+            
             if (len > 0) {
                 let nx = dy / len, ny = -dx / len; 
                 let cx = (s1.x + s2.x)/2 + 2 * d_screen * nx; let cy = (s1.y + s2.y)/2 + 2 * d_screen * ny;
-                ctx.moveTo(s1.x, s1.y); ctx.quadraticCurveTo(cx, cy, s2.x, s2.y); ctx.stroke();
+                
+                // Calculate the angle of the curve as it leaves/enters the nodes
+                let angStart = Math.atan2(cy - s1.y, cx - s1.x);
+                let angEnd = Math.atan2(s2.y - cy, s2.x - cx);
+                
+                // Trim the curve to the node borders
+                let startX = s1.x + (r1 + 2) * Math.cos(angStart);
+                let startY = s1.y + (r1 + 2) * Math.sin(angStart);
+                let endX = s2.x - (r2 + 2) * Math.cos(angEnd);
+                let endY = s2.y - (r2 + 2) * Math.sin(angEnd);
+                
+                ctx.moveTo(startX, startY); ctx.quadraticCurveTo(cx, cy, endX, endY); ctx.stroke();
                 midX = (s1.x + s2.x)/2 + d_screen * nx; midY = (s1.y + s2.y)/2 + d_screen * ny;
-                if (['end','both'].includes(e.arrow)) { let ang = Math.atan2(s2.y-cy, s2.x-cx); drawArrowhead(ctx, s2.x-5*Math.cos(ang), s2.y-5*Math.sin(ang), ang, ctx.strokeStyle); }
-                if (['start','both'].includes(e.arrow)) { let ang = Math.atan2(s1.y-cy, s1.x-cx); drawArrowhead(ctx, s1.x+5*Math.cos(ang), s1.y+5*Math.sin(ang), ang+Math.PI, ctx.strokeStyle); }
+                
+                if (['end','both'].includes(e.arrow)) drawArrowhead(ctx, endX, endY, angEnd, ctx.strokeStyle);
+                if (['start','both'].includes(e.arrow)) drawArrowhead(ctx, startX, startY, angStart + Math.PI, ctx.strokeStyle);
             }
         } else if (e.type === 'loop') {
             let r = e.radius * u; let ang = e.loopAngle * Math.PI / 180;
@@ -1040,5 +1078,57 @@ window.snapBipartite = function() {
     saveState(); updatePropertyPanel(); draw();
 };
 
+
+// ==========================================
+// RIGHT-CLICK CONTEXT MENU LOGIC
+// ==========================================
+
+canvas.addEventListener('contextmenu', (e) => {
+    e.preventDefault(); // Stop the default browser menu from opening
+
+    const mx = e.clientX - canvas.getBoundingClientRect().left;
+    const my = e.clientY - canvas.getBoundingClientRect().top;
+
+    // 1. Quick hit-detect to see if the user right-clicked on a point
+    let pObj = window.points.find(p => {
+        let s = mathToScreen(p.x, p.y);
+        let r = p.radius !== undefined ? p.radius : 5;
+        return Math.hypot(s.x - mx, s.y - my) < Math.max(r + 5, 15);
+    });
+
+    // 2. If they right-clicked a point, auto-select it!
+    if (pObj) {
+        if (!window.selectedPointIds.includes(pObj.id)) {
+            window.selectedPointIds = [pObj.id];
+            window.selectedEdgeIds = [];
+            window.selectedTextIds = [];
+            window.selectedRegionIds = [];
+            window.setMode('select', true);
+        }
+    }
+
+    // 3. If ANY item is selected (points, edges, or regions), show the menu
+    if (window.selectedPointIds.length > 0 || window.selectedEdgeIds.length > 0 || window.selectedTextIds.length > 0 || window.selectedRegionIds.length > 0) {
+        const menu = document.getElementById('context-menu');
+        menu.style.display = 'block';
+        menu.style.left = e.pageX + 'px';
+        menu.style.top = e.pageY + 'px';
+    }
+});
+
+// Hide the menu if the user left-clicks anywhere else on the screen
+document.addEventListener('click', (e) => {
+    const menu = document.getElementById('context-menu');
+    // If the click wasn't inside the context menu, close it
+    if (menu && e.target.closest('#context-menu') === null) {
+        menu.style.display = 'none';
+    }
+});
+
+// The function triggered by the color swatches
+window.fastColor = function(colorName) {
+    window.applyPropertyToSelection('color', colorName);
+    document.getElementById('context-menu').style.display = 'none'; // Close menu after painting
+};
 
 setTimeout(() => { saveState(); draw(); }, 100);

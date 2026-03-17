@@ -157,3 +157,21 @@ window.addEventListener('DOMContentLoaded', () => {
         if (icon) icon.innerText = 'light_mode';
     }
 });
+window.copyCode = function() {
+    const codeBox = document.getElementById('codeOutput');
+    if (!codeBox.value || codeBox.value.startsWith("% Add points")) return;
+
+    navigator.clipboard.writeText(codeBox.value).then(() => {
+        const btn = document.getElementById('copy-btn');
+        const originalHTML = btn.innerHTML;
+        
+        // Change to a checkmark temporarily
+        btn.innerHTML = `<span class="material-symbols-outlined" style="font-size: 16px;">check</span> Copied!`;
+        btn.style.background = "#20c997"; // Slightly different green
+        
+        setTimeout(() => {
+            btn.innerHTML = originalHTML;
+            btn.style.background = "#28a745";
+        }, 1500);
+    });
+};
