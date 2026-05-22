@@ -735,7 +735,21 @@ function drawArrowhead(ctx, x, y, angle, color) {
     ctx.lineTo(x - 12 * Math.cos(angle + Math.PI/6), y - 12 * Math.sin(angle + Math.PI/6)); ctx.fill();
 }
 
-function parsePlotTable(text, mode) {
+function getPlotControlState() {
+    return {
+        type: document.getElementById('plot-type')?.value || 'line',
+        mode: document.getElementById('plot-mode')?.value || 'shared-x',
+        title: (document.getElementById('plot-title')?.value || '').trim(),
+        xlabel: (document.getElementById('plot-xlabel')?.value || '').trim() || 'x',
+        ylabel: (document.getElementById('plot-ylabel')?.value || '').trim() || 'y',
+        legendPos: document.getElementById('plot-legend-pos')?.value || 'best',
+        showGrid: document.getElementById('plot-grid') ? document.getElementById('plot-grid').checked : true,
+        showLegend: document.getElementById('plot-legend') ? document.getElementById('plot-legend').checked : true,
+    };
+}
+
+function parsePlotTable(text, options) {
+    const control = options || getPlotControlState();
     const rows = text
         .split(/\r?\n/)
         .map(line => line.trim())
@@ -794,10 +808,14 @@ function parsePlotTable(text, mode) {
 
     return {
         id: window.plotIdCounter++,
-        mode,
-        title: (document.getElementById('plot-title')?.value || '').trim(),
-        xlabel: (document.getElementById('plot-xlabel')?.value || '').trim() || 'x',
-        ylabel: (document.getElementById('plot-ylabel')?.value || '').trim() || 'y',
+        type: control.type,
+        mode: control.mode,
+        title: control.title,
+        xlabel: control.xlabel,
+        ylabel: control.ylabel,
+        legendPos: control.legendPos,
+        showGrid: control.showGrid,
+        showLegend: control.showLegend,
         series,
         bounds: {
             xMin: xMin === xMax ? xMin - 1 : xMin,
@@ -812,6 +830,52 @@ function getPlotPalette() {
     return ['#0056b3', '#d63384', '#20c997', '#fd7e14', '#6f42c1', '#198754', '#dc3545', '#0d6efd'];
 }
 
+function buildPlotLegendEntries(plot, palette) {
+    return plot.series.map((series, index) => ({
+        label: series.name || `Series ${index + 1}`,
+        color: palette[index % palette.length],
+    }));
+}
+
+function drawPlotLegend(plotCtx, plot, box, entries) {
+    if (!plot.showLegend || entries.length === 0) return;
+    const padding = 10;
+    const lineHeight = 18;
+    const sampleWidth = 18;
+    plotCtx.font = '12px sans-serif';
+    const widths = entries.map(entry => plotCtx.measureText(entry.label).width);
+    const legendWidth = Math.max(...widths, 0) + sampleWidth + padding * 3;
+    const legendHeight = entries.length * lineHeight + padding * 2;
+    const legendX = plot.legendPos === 'upper left' || plot.legendPos === 'lower left' ? box.x + 18 : box.x + box.w - legendWidth - 18;
+    const legendY = plot.legendPos === 'lower left' || plot.legendPos === 'lower right' ? box.y + box.h - legendHeight - 18 : box.y + 18;
+
+    plotCtx.save();
+    plotCtx.fillStyle = 'rgba(255,255,255,0.9)';
+    plotCtx.strokeStyle = 'rgba(0,0,0,0.12)';
+    plotCtx.lineWidth = 1;
+    plotCtx.beginPath();
+    if (plotCtx.roundRect) plotCtx.roundRect(legendX, legendY, legendWidth, legendHeight, 10); else plotCtx.rect(legendX, legendY, legendWidth, legendHeight);
+    plotCtx.fill();
+    plotCtx.stroke();
+    plotCtx.fillStyle = '#222';
+    entries.forEach((entry, index) => {
+        const y = legendY + padding + index * lineHeight + 10;
+        plotCtx.strokeStyle = entry.color;
+        plotCtx.fillStyle = entry.color;
+        plotCtx.lineWidth = 2;
+        plotCtx.beginPath();
+        plotCtx.moveTo(legendX + padding, y);
+        plotCtx.lineTo(legendX + padding + sampleWidth, y);
+        plotCtx.stroke();
+        plotCtx.beginPath();
+        plotCtx.arc(legendX + padding + sampleWidth / 2, y, 3, 0, Math.PI * 2);
+        plotCtx.fill();
+        plotCtx.fillStyle = '#222';
+        plotCtx.fillText(entry.label, legendX + padding + sampleWidth + 8, y + 4);
+    });
+    plotCtx.restore();
+}
+
 function renderPlotCanvas() {
     const plotCanvas = document.getElementById('plotCanvas');
     if (!plotCanvas) return;
@@ -820,6 +884,7 @@ function renderPlotCanvas() {
     plotCanvas.style.display = hasPlot ? 'block' : 'none';
     if (!hasPlot) {
         plotCtx.clearRect(0, 0, plotCanvas.width, plotCanvas.height);
+        window._activePlotLayout = null;
         return;
     }
 
@@ -833,6 +898,8 @@ function renderPlotCanvas() {
     plotCtx.clearRect(0, 0, width, height);
 
     const plot = window.plots[0];
+    const palette = getPlotPalette();
+    const legendEntries = buildPlotLegendEntries(plot, palette);
     const box = { x: width * 0.12, y: height * 0.12, w: width * 0.76, h: height * 0.76 };
     const pad = 42;
     const left = box.x + pad;
@@ -841,6 +908,12 @@ function renderPlotCanvas() {
     const bottom = box.y + box.h - 32;
     const chartW = right - left;
     const chartH = bottom - top;
+    const xMin = plot.bounds.xMin;
+    const xMax = plot.bounds.xMax;
+    const yMin = plot.bounds.yMin;
+    const yMax = plot.bounds.yMax;
+    const xSpan = xMax - xMin || 1;
+    const ySpan = yMax - yMin || 1;
 
     plotCtx.fillStyle = 'rgba(255,255,255,0.92)';
     plotCtx.strokeStyle = 'rgba(0,0,0,0.15)';
@@ -857,29 +930,6 @@ function renderPlotCanvas() {
         plotCtx.fillText(plot.title, box.x + box.w / 2, box.y + 22);
     }
 
-    const xMin = plot.bounds.xMin;
-    const xMax = plot.bounds.xMax;
-    const yMin = plot.bounds.yMin;
-    const yMax = plot.bounds.yMax;
-    const xSpan = xMax - xMin;
-    const ySpan = yMax - yMin;
-    const xToPx = (x) => left + ((x - xMin) / xSpan) * chartW;
-    const yToPx = (y) => bottom - ((y - yMin) / ySpan) * chartH;
-
-    plotCtx.strokeStyle = 'rgba(0,0,0,0.08)';
-    plotCtx.lineWidth = 1;
-    for (let i = 0; i <= 5; i++) {
-        const gx = left + (chartW * i) / 5;
-        const gy = top + (chartH * i) / 5;
-        plotCtx.beginPath(); plotCtx.moveTo(gx, top); plotCtx.lineTo(gx, bottom); plotCtx.stroke();
-        plotCtx.beginPath(); plotCtx.moveTo(left, gy); plotCtx.lineTo(right, gy); plotCtx.stroke();
-    }
-
-    plotCtx.strokeStyle = '#111';
-    plotCtx.lineWidth = 1.5;
-    plotCtx.beginPath(); plotCtx.moveTo(left, bottom); plotCtx.lineTo(right, bottom); plotCtx.stroke();
-    plotCtx.beginPath(); plotCtx.moveTo(left, top); plotCtx.lineTo(left, bottom); plotCtx.stroke();
-
     plotCtx.font = '12px sans-serif';
     plotCtx.fillStyle = '#333';
     plotCtx.textAlign = 'center';
@@ -890,34 +940,104 @@ function renderPlotCanvas() {
     plotCtx.fillText(plot.ylabel, 0, 0);
     plotCtx.restore();
 
-    const palette = getPlotPalette();
-    plot.series.forEach((series, index) => {
-        const color = palette[index % palette.length];
+    const toX = (x) => left + ((x - xMin) / xSpan) * chartW;
+    const toY = (y) => bottom - ((y - yMin) / ySpan) * chartH;
+
+    if (plot.showGrid) {
+        plotCtx.strokeStyle = 'rgba(0,0,0,0.08)';
+        plotCtx.lineWidth = 1;
+        for (let i = 0; i <= 5; i++) {
+            const gx = left + (chartW * i) / 5;
+            const gy = top + (chartH * i) / 5;
+            plotCtx.beginPath(); plotCtx.moveTo(gx, top); plotCtx.lineTo(gx, bottom); plotCtx.stroke();
+            plotCtx.beginPath(); plotCtx.moveTo(left, gy); plotCtx.lineTo(right, gy); plotCtx.stroke();
+        }
+    }
+
+    plotCtx.strokeStyle = '#111';
+    plotCtx.lineWidth = 1.5;
+    plotCtx.beginPath(); plotCtx.moveTo(left, bottom); plotCtx.lineTo(right, bottom); plotCtx.stroke();
+    plotCtx.beginPath(); plotCtx.moveTo(left, top); plotCtx.lineTo(left, bottom); plotCtx.stroke();
+
+    const drawLineSeries = (series, color) => {
         plotCtx.strokeStyle = color;
         plotCtx.fillStyle = color;
         plotCtx.lineWidth = 2.2;
         plotCtx.beginPath();
         series.x.forEach((x, pointIndex) => {
-            const px = xToPx(x);
-            const py = yToPx(series.y[pointIndex]);
+            const px = toX(x);
+            const py = toY(series.y[pointIndex]);
             if (pointIndex === 0) plotCtx.moveTo(px, py); else plotCtx.lineTo(px, py);
         });
         plotCtx.stroke();
-
         series.x.forEach((x, pointIndex) => {
-            const px = xToPx(x);
-            const py = yToPx(series.y[pointIndex]);
+            const px = toX(x);
+            const py = toY(series.y[pointIndex]);
             plotCtx.beginPath();
             plotCtx.arc(px, py, 3.5, 0, Math.PI * 2);
             plotCtx.fill();
         });
+    };
+
+    const drawScatterSeries = (series, color) => {
+        plotCtx.fillStyle = color;
+        series.x.forEach((x, pointIndex) => {
+            const px = toX(x);
+            const py = toY(series.y[pointIndex]);
+            plotCtx.beginPath();
+            plotCtx.arc(px, py, 4, 0, Math.PI * 2);
+            plotCtx.fill();
+        });
+    };
+
+    const drawStepSeries = (series, color) => {
+        plotCtx.strokeStyle = color;
+        plotCtx.fillStyle = color;
+        plotCtx.lineWidth = 2.2;
+        plotCtx.beginPath();
+        series.x.forEach((x, pointIndex) => {
+            const px = toX(x);
+            const py = toY(series.y[pointIndex]);
+            if (pointIndex === 0) {
+                plotCtx.moveTo(px, py);
+            } else {
+                plotCtx.lineTo(px, toY(series.y[pointIndex - 1]));
+                plotCtx.lineTo(px, py);
+            }
+        });
+        plotCtx.stroke();
+    };
+
+    const drawBarSeries = (series, color, seriesIndex) => {
+        plotCtx.fillStyle = color;
+        const xValues = [...new Set(series.x)].sort((a, b) => a - b);
+        const groupWidth = chartW / Math.max(xValues.length, 1);
+        const barWidth = groupWidth / (window.plots[0].series.length + 1);
+        xValues.forEach((xVal) => {
+            const idx = series.x.findIndex(x => x === xVal);
+            if (idx < 0) return;
+            const xCenter = toX(xVal);
+            const barTop = toY(series.y[idx]);
+            const xOffset = (seriesIndex - (window.plots[0].series.length - 1) / 2) * barWidth;
+            plotCtx.fillRect(xCenter + xOffset - barWidth / 2, barTop, barWidth * 0.85, bottom - barTop);
+        });
+    };
+
+    plot.series.forEach((series, index) => {
+        const color = palette[index % palette.length];
+        if (plot.type === 'scatter') drawScatterSeries(series, color);
+        else if (plot.type === 'bar') drawBarSeries(series, color, index);
+        else if (plot.type === 'step') drawStepSeries(series, color);
+        else drawLineSeries(series, color);
     });
+
+    drawPlotLegend(plotCtx, plot, box, legendEntries);
+    window._activePlotLayout = { plot, box, left, top, right, bottom, xMin, xMax, yMin, yMax, chartW, chartH };
 }
 
 window.generatePlotFromTable = function() {
     const table = document.getElementById('plot-table');
-    const mode = document.getElementById('plot-mode').value;
-    const plot = parsePlotTable(table ? table.value : '', mode);
+    const plot = parsePlotTable(table ? table.value : '', getPlotControlState());
     if (!plot) {
         window.plots = [];
         renderPlotCanvas();
@@ -930,8 +1050,24 @@ window.generatePlotFromTable = function() {
     draw();
 };
 
+window.importPlotCSV = function(event) {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(ev) {
+        const table = document.getElementById('plot-table');
+        if (table) table.value = ev.target.result;
+        generatePlotFromTable();
+    };
+    reader.readAsText(file);
+    event.target.value = '';
+};
+
 window.clearPlot = function() {
     window.plots = [];
+    window._activePlotLayout = null;
+    const readout = document.getElementById('plot-readout');
+    if (readout) readout.innerText = 'Move the mouse over the plot preview to inspect coordinates.';
     renderPlotCanvas();
     saveState();
     draw();
@@ -947,18 +1083,85 @@ window.generateMatplotlibCode = function() {
         const label = series.name ? JSON.stringify(series.name) : JSON.stringify(`Series ${index + 1}`);
         lines.push(`x${index + 1} = ${JSON.stringify(series.x)}`);
         lines.push(`y${index + 1} = ${JSON.stringify(series.y)}`);
-        lines.push(`plt.plot(x${index + 1}, y${index + 1}, marker='o', linewidth=2, label=${label})`);
+        if (plot.type === 'scatter') lines.push(`plt.scatter(x${index + 1}, y${index + 1}, label=${label})`);
+        else if (plot.type === 'bar') lines.push(`plt.bar(x${index + 1}, y${index + 1}, label=${label}, alpha=0.85)`);
+        else if (plot.type === 'step') lines.push(`plt.step(x${index + 1}, y${index + 1}, where='mid', label=${label})`);
+        else lines.push(`plt.plot(x${index + 1}, y${index + 1}, marker='o', linewidth=2, label=${label})`);
         lines.push('');
     });
     if (plot.title) lines.push(`plt.title(${JSON.stringify(plot.title)})`);
     lines.push(`plt.xlabel(${JSON.stringify(plot.xlabel || 'x')})`);
     lines.push(`plt.ylabel(${JSON.stringify(plot.ylabel || 'y')})`);
-    lines.push('plt.grid(True, alpha=0.3)');
-    lines.push('plt.legend()');
+    if (plot.showGrid) lines.push('plt.grid(True, alpha=0.3)');
+    if (plot.showLegend) lines.push(`plt.legend(loc=${JSON.stringify(plot.legendPos || 'best')})`);
     lines.push('plt.tight_layout()');
     lines.push('plt.show()');
     return lines.join('\n');
 };
+
+window.generatePGFPlotsCode = function() {
+    if (!window.plots || window.plots.length === 0) return '% Add plot data and click Render Plot to generate PGFPlots code.';
+    const plot = window.plots[0];
+    const lines = [];
+    lines.push('\\begin{tikzpicture}');
+    lines.push(`\\begin{axis}[title={${plot.title || ''}}, xlabel={${plot.xlabel || 'x'}}, ylabel={${plot.ylabel || 'y'}}, grid=${plot.showGrid ? 'both' : 'none'}]`);
+    plot.series.forEach((series, index) => {
+        const label = series.name || `Series ${index + 1}`;
+        const coords = series.x.map((x, i) => `(${x},${series.y[i]})`).join(' ');
+        if (plot.type === 'scatter') lines.push(`\\addplot+[only marks] coordinates { ${coords} };`);
+        else if (plot.type === 'bar') lines.push(`\\addplot+[ybar] coordinates { ${coords} };`);
+        else if (plot.type === 'step') lines.push(`\\addplot+[const plot mark left] coordinates { ${coords} };`);
+        else lines.push(`\\addplot coordinates { ${coords} };`);
+        if (plot.showLegend) lines.push(`\\addlegendentry{${label}}`);
+    });
+    lines.push('\\end{axis}');
+    lines.push('\\end{tikzpicture}');
+    return lines.join('\n');
+};
+
+window.generateGnuplotCode = function() {
+    if (!window.plots || window.plots.length === 0) return '# Add plot data and click Render Plot to generate Gnuplot code.';
+    const plot = window.plots[0];
+    const lines = [];
+    lines.push(`set title ${JSON.stringify(plot.title || '')}`);
+    lines.push(`set xlabel ${JSON.stringify(plot.xlabel || 'x')}`);
+    lines.push(`set ylabel ${JSON.stringify(plot.ylabel || 'y')}`);
+    if (plot.showGrid) lines.push('set grid');
+    lines.push('plot \\');
+    plot.series.forEach((series, index) => {
+        const label = series.name || `Series ${index + 1}`;
+        const style = plot.type === 'scatter' ? 'with points pointtype 7' : plot.type === 'bar' ? 'with boxes' : plot.type === 'step' ? 'with steps' : 'with linespoints';
+        lines.push(`'-' ${style} title ${JSON.stringify(label)}${index < plot.series.length - 1 ? ', \\' : ''}`);
+        series.x.forEach((x, i) => {
+            lines.push(`${x} ${series.y[i]}`);
+        });
+        lines.push('e');
+    });
+    return lines.join('\n');
+};
+
+const plotContainer = document.getElementById('canvas-container');
+if (plotContainer) {
+    plotContainer.addEventListener('mousemove', (event) => {
+        const readout = document.getElementById('plot-readout');
+        if (!readout || !window._activePlotLayout || !window.plots || window.plots.length === 0) return;
+        const layout = window._activePlotLayout;
+        const rect = canvas.getBoundingClientRect();
+        const mx = event.clientX - rect.left;
+        const my = event.clientY - rect.top;
+        if (mx < layout.left || mx > layout.right || my < layout.top || my > layout.bottom) {
+            readout.innerText = 'Move the mouse over the plot preview to inspect coordinates.';
+            return;
+        }
+        const x = layout.xMin + ((mx - layout.left) / layout.chartW) * (layout.xMax - layout.xMin);
+        const y = layout.yMin + ((layout.bottom - my) / layout.chartH) * (layout.yMax - layout.yMin);
+        readout.innerText = `x = ${x.toFixed(3)}, y = ${y.toFixed(3)}`;
+    });
+    plotContainer.addEventListener('mouseleave', () => {
+        const readout = document.getElementById('plot-readout');
+        if (readout) readout.innerText = 'Move the mouse over the plot preview to inspect coordinates.';
+    });
+}
 
 window.draw = function() {
     ctx.clearRect(0, 0, canvasWidth, canvasHeight);

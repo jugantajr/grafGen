@@ -76,6 +76,8 @@ Access the generated code from the right-hand panel.
 
 grafGen also supports simple XY plot tables for chart previewing and Matplotlib export.
 
+The plot panel lets you choose a chart type, import CSV text, toggle grid and legend display, and export the same data to Matplotlib, PGFPlots, or Gnuplot.
+
 Choose one of these modes in the plot panel:
 
 * **One x column, many y series:** One shared x column with one or more y columns.
@@ -97,6 +99,8 @@ x1, y1, x2, y2
 ```
 
 Use commas, spaces, or semicolons as separators, then click **Render Plot** to preview the chart and generate Matplotlib code.
+
+Supported chart types include **line**, **scatter**, **bar**, and **step**.
 
 TikZ and PSTricks exports deduplicate repeated node and edge styles so the generated LaTeX stays smaller and easier to edit.
 

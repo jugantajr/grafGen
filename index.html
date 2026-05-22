@@ -148,6 +148,8 @@
                         <option value="tikz">TikZ</option>
                         <option value="matrix">Matrices (A, D, L)</option>
                         <option value="matplotlib">Matplotlib</option>
+                        <option value="pgfplots">PGFPlots</option>
+                        <option value="gnuplot">Gnuplot</option>
                         <option value="python">Python (NetworkX)</option>
                         <option value="sage">SageMath</option>
                         <option value="mathematica">Mathematica</option>
@@ -159,6 +161,12 @@
             <div class="tool-group" style="margin-top: 8px; align-items: flex-start; flex-direction: column; gap: 6px; width: 100%;">
                 <strong style="color: #0056b3;">XY Plot Table:</strong>
                 <div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center; width: 100%;">
+                    <select id="plot-type" title="Choose plot type">
+                        <option value="line">Line</option>
+                        <option value="scatter">Scatter</option>
+                        <option value="bar">Bar</option>
+                        <option value="step">Step</option>
+                    </select>
                     <select id="plot-mode" title="Choose plot table mode">
                         <option value="shared-x">One x column, many y series</option>
                         <option value="paired">Several x-y plots in one table</option>
@@ -166,12 +174,24 @@
                     <input id="plot-title" type="text" placeholder="Title" style="width: 120px;">
                     <input id="plot-xlabel" type="text" placeholder="X label" style="width: 90px;">
                     <input id="plot-ylabel" type="text" placeholder="Y label" style="width: 90px;">
+                    <select id="plot-legend-pos" title="Legend position">
+                        <option value="best">Legend: Auto</option>
+                        <option value="upper right">Legend: Upper Right</option>
+                        <option value="upper left">Legend: Upper Left</option>
+                        <option value="lower right">Legend: Lower Right</option>
+                        <option value="lower left">Legend: Lower Left</option>
+                    </select>
+                    <label title="Show grid" style="display: inline-flex; align-items: center; gap: 4px;"><input type="checkbox" id="plot-grid" checked> Grid</label>
+                    <label title="Show legend" style="display: inline-flex; align-items: center; gap: 4px;"><input type="checkbox" id="plot-legend" checked> Legend</label>
                 </div>
                 <textarea id="plot-table" placeholder="shared-x example:\nx, y1, y2\n0, 1, 2\n1, 3, 4\n2, 5, 8" style="width: 100%; min-height: 92px; resize: vertical;"></textarea>
                 <div style="display: flex; gap: 6px;">
                     <button onclick="generatePlotFromTable()" style="background: #0056b3; color: white; border-color: #004494; font-weight: bold;">Render Plot</button>
                     <button onclick="clearPlot()" style="background: #6c757d; color: white; border-color: #5a6268;">Clear Plot</button>
+                    <button onclick="document.getElementById('plot-file-import').click()" style="background: #20c997; color: white; border-color: #1aa179; font-weight: bold;">Import CSV</button>
+                    <input type="file" id="plot-file-import" style="display: none;" accept=".csv,.txt" onchange="importPlotCSV(event)">
                 </div>
+                <div id="plot-readout" style="font-size: 12px; color: #666; min-height: 16px;">Move the mouse over the plot preview to inspect coordinates.</div>
             </div>
             <textarea id="codeOutput" readonly title="Copy this code into your LaTeX document"></textarea>
             <p style="font-size: 11px; color: #666; margin-top: 5px;">* Select any item and press <b>Delete</b> on your keyboard to remove it.</p>
@@ -220,6 +240,8 @@
 
                     <h3 style="color: #0056b3; margin-bottom: 10px; border-bottom: 2px solid #eef2f5; padding-bottom: 5px; margin-top: 25px;">📈 XY Plot Table Examples</h3>
                     <ul style="line-height: 1.8; list-style: none; padding-left: 0; margin-top: 0; font-size: 14px;">
+                        <li><b>Chart types:</b> Use the plot type dropdown to switch between line, scatter, bar, and step previews.</li>
+                        <li><b>CSV import:</b> Use <b>Import CSV</b> to load a `.csv` or `.txt` table into the plot editor.</li>
                         <li><b>One x column, many y series:</b> Use one shared x column and one column per series.
                             <pre style="white-space: pre-wrap; background: #f8f9fb; border: 1px solid #e1e5ea; padding: 8px; border-radius: 6px; margin: 6px 0 0;">x, y1, y2
 0, 1, 2
@@ -233,6 +255,7 @@
 2, 5, 2, 8</pre>
                         </li>
                         <li style="margin-top: 10px;">Use commas, spaces, or semicolons as separators. The first row is treated as labels.</li>
+                        <li style="margin-top: 10px;">The plot preview supports grid and legend toggles, and the generated code can be copied as Matplotlib, PGFPlots, or Gnuplot.</li>
                     </ul>
                 </div>
 

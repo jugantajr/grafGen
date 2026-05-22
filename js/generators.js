@@ -131,6 +131,16 @@ window.generateCode = function() {
         return;
     }
 
+    if (format === 'pgfplots') {
+        out.value = window.generatePGFPlotsCode ? window.generatePGFPlotsCode() : '% Add plot data and click Render Plot to generate PGFPlots code.';
+        return;
+    }
+
+    if (format === 'gnuplot') {
+        out.value = window.generateGnuplotCode ? window.generateGnuplotCode() : '# Add plot data and click Render Plot to generate Gnuplot code.';
+        return;
+    }
+
     if (format === 'python') {
         out.value = window.generatePythonNetworkX();
         return;
