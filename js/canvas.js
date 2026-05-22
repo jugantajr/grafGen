@@ -762,7 +762,7 @@ function parsePlotTable(text, options) {
     const dataRows = rows.slice(1);
     const series = [];
 
-    if (mode === 'paired') {
+    if (control.mode === 'paired') {
         for (let i = 0; i + 1 < headers.length; i += 2) {
             const points = [];
             dataRows.forEach(row => {
