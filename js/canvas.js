@@ -3,6 +3,30 @@ const ctx = canvas.getContext('2d');
 const dpr = window.devicePixelRatio || 1;
 document.getElementById('canvas-container').style.position = 'relative';
 
+// Global error handlers: log full stack and attempt graceful recovery so UI doesn't remain frozen
+window.addEventListener('error', (ev) => {
+    try {
+        console.error('Captured error:', ev.message, ev.filename + ':' + ev.lineno + ':' + ev.colno);
+        if (ev.error && ev.error.stack) console.error(ev.error.stack);
+        // Attempt to clean up transient UI state that may block interactions
+        setTimeout(() => {
+            try {
+                const inp = document.getElementById('inline-text-editor'); if (inp && inp.isConnected) inp.remove();
+                const menu = document.getElementById('context-menu'); if (menu) menu.style.display = 'none';
+                if (window._generateCodeTimer) { clearTimeout(window._generateCodeTimer); window._generateCodeTimer = null; }
+                if (typeof draw === 'function') draw();
+            } catch (cleanupErr) { console.error('Recovery cleanup failed:', cleanupErr); }
+        }, 50);
+    } catch (logErr) { console.error('Error in global error handler:', logErr); }
+});
+
+window.addEventListener('unhandledrejection', (ev) => {
+    try {
+        console.error('Unhandled promise rejection:', ev.reason);
+        setTimeout(() => { try { const inp = document.getElementById('inline-text-editor'); if (inp && inp.isConnected) inp.remove(); if (typeof draw === 'function') draw(); } catch(e){console.error(e);} }, 50);
+    } catch(e) { console.error('Error in unhandledrejection handler:', e); }
+});
+
 const baseUnitSize = 50; 
 let canvasWidth = 600; let canvasHeight = 600;
 let originX = canvasWidth / 2; let originY = canvasHeight / 2;
@@ -84,6 +108,17 @@ function screenToMath(sx, sy, ignoreObjectSnap = false) {
 }
 
 function mathToScreen(mx, my) { return { x: originX + (mx * getUnitSize()), y: originY - (my * getUnitSize()) }; }
+
+// Debounced code generation to avoid blocking during rapid interactive changes
+window._generateCodeTimer = null;
+window.requestGenerateCode = function(delay = 200) {
+    if (window._generateCodeTimer) clearTimeout(window._generateCodeTimer);
+    window._generateCodeTimer = setTimeout(() => {
+        try { if (window.generateCode) window.generateCode(); }
+        catch (err) { console.error('generateCode error:', err); }
+        window._generateCodeTimer = null;
+    }, delay);
+};
 
 // Ray-casting algorithm for the Lasso tool
 function isPointInPolygon(point, vs) {
@@ -284,15 +319,16 @@ window.insertMacro = function() {
 };
 
 function updateHUD() {
-    const hud = document.getElementById('graph-hud'); if (!hud) return;
-    
+    const el = (id) => document.getElementById(id);
+    const hud = el('graph-hud'); if (!hud) return;
+
     let vCount = window.points.length;
     let eCount = window.edges.filter(e => ['line', 'curve', 'loop'].includes(e.type) && e.sourceId !== undefined && e.targetId !== undefined).length;
-    
-    document.getElementById('hud-v').innerText = vCount;
-    document.getElementById('hud-e').innerText = eCount;
-    
-    const degContainer = document.getElementById('hud-deg-container');
+
+    const hudV = el('hud-v'); if (hudV) hudV.innerText = vCount;
+    const hudE = el('hud-e'); if (hudE) hudE.innerText = eCount;
+
+    const degContainer = el('hud-deg-container');
     if (window.selectedPointIds && window.selectedPointIds.length === 1) {
         let pId = window.selectedPointIds[0]; let degree = 0;
         window.edges.forEach(e => {
@@ -301,10 +337,11 @@ function updateHUD() {
                 else if (e.sourceId === pId || e.targetId === pId) degree += 1;
             }
         });
-        document.getElementById('hud-deg').innerText = degree; degContainer.style.display = 'block';
-    } else { degContainer.style.display = 'none'; }
+        const hudDeg = el('hud-deg'); if (hudDeg) hudDeg.innerText = degree;
+        if (degContainer) degContainer.style.display = 'block';
+    } else { if (degContainer) degContainer.style.display = 'none'; }
 
-    const specContainer = document.getElementById('hud-spec-container');
+    const specContainer = el('hud-spec-container');
     if (vCount > 0 && typeof numeric !== 'undefined') {
         let idToIndex = {}; window.points.forEach((p, i) => idToIndex[p.id] = i);
         let A = Array(vCount).fill(0).map(() => Array(vCount).fill(0));
@@ -331,83 +368,89 @@ function updateHUD() {
                 if (Math.abs(val.im) > 1e-6) return roundedRe.toFixed(2) + (val.im > 0 ? '+' : '') + val.im.toFixed(2) + 'i';
                 return roundedRe.toFixed(2);
             });
-            document.getElementById('hud-spec').innerText = '{ ' + formatted.join(', ') + ' }';
-            specContainer.style.display = 'block';
-        } catch(err) { specContainer.style.display = 'none'; }
-    } else { specContainer.style.display = 'none'; }
+            const hudSpec = el('hud-spec'); if (hudSpec) hudSpec.innerText = '{ ' + formatted.join(', ') + ' }';
+            if (specContainer) specContainer.style.display = 'block';
+        } catch(err) { if (specContainer) specContainer.style.display = 'none'; }
+    } else { if (specContainer) specContainer.style.display = 'none'; }
 }
 
 function updatePropertyPanel() {
+    // Safe DOM access helpers
+    const el = (id) => document.getElementById(id);
+    const setDisplay = (id, v) => { let e = el(id); if (e) e.style.display = v; };
+    const setValue = (id, v) => { let e = el(id); if (e) e.value = v; };
+    const setInner = (id, v) => { let e = el(id); if (e) e.innerHTML !== undefined ? e.innerHTML = v : (e && (e.innerText = v)); };
+
     const wPanel = document.getElementById('properties-wrapper'); 
     const pPlaceholder = document.getElementById('properties-placeholder');
     const delBtn = document.getElementById('prop-delete-btn');
     
     // Hide all dynamic property wrappers by default
-    ['wrap-label','wrap-angle','wrap-pos','wrap-radius','wrap-offset','wrap-loop-angle','wrap-start','wrap-end','wrap-arrow','wrap-p-style','wrap-l-style'].forEach(id => { document.getElementById(id).style.display = 'none'; });
+    ['wrap-label','wrap-angle','wrap-pos','wrap-radius','wrap-offset','wrap-loop-angle','wrap-start','wrap-end','wrap-arrow','wrap-p-style','wrap-l-style'].forEach(id => { setDisplay(id, 'none'); });
 
     if(delBtn) delBtn.disabled = true;
-    pPlaceholder.innerText = "Select an item to edit"; // Default text
+    if (pPlaceholder) pPlaceholder.innerText = "Select an item to edit"; // Default text
 
     // 🎨 Paint Mode Helper Text
     if (currentMode === 'paint') {
-        wPanel.style.display = 'none'; 
-        pPlaceholder.style.display = 'inline';
-        pPlaceholder.innerText = "🖌️ Click items on canvas to paint them";
+        if (wPanel) wPanel.style.display = 'none'; 
+        if (pPlaceholder) pPlaceholder.style.display = 'inline';
+        if (pPlaceholder) pPlaceholder.innerText = "🖌️ Click items on canvas to paint them";
         
         // Ensure color picker reflects the current active drawing color
         let activeCol = window.activeColor || 'Black';
-        document.getElementById('current-color').innerHTML = `<span class="color-box" style="background: ${window.getHexFromName(activeCol)};"></span> ${activeCol}`;
+        setInner('current-color', `<span class="color-box" style="background: ${window.getHexFromName(activeCol)};"></span> ${activeCol}`);
         return;
     }
 
     // If nothing is selected, hide properties and ensure color picker shows the global active color
     if (window.selectedPointIds.length === 0 && window.selectedEdgeIds.length === 0 && window.selectedTextIds.length === 0 && window.selectedRegionIds.length === 0) {
-        wPanel.style.display = 'none'; 
-        pPlaceholder.style.display = 'inline'; 
+        if (wPanel) wPanel.style.display = 'none'; 
+        if (pPlaceholder) pPlaceholder.style.display = 'inline'; 
         
         let activeCol = window.activeColor || 'Black';
-        document.getElementById('current-color').innerHTML = `<span class="color-box" style="background: ${window.getHexFromName(activeCol)};"></span> ${activeCol}`;
+        setInner('current-color', `<span class="color-box" style="background: ${window.getHexFromName(activeCol)};"></span> ${activeCol}`);
         return;
     }
 
     // Show Properties Panel when items are selected
-    wPanel.style.display = 'flex'; pPlaceholder.style.display = 'none';
+    if (wPanel) wPanel.style.display = 'flex'; if (pPlaceholder) pPlaceholder.style.display = 'none';
     if(delBtn) delBtn.disabled = false; 
 
     // Update properties and color picker based on selected item
     if (window.selectedPointIds.length > 0) {
         let p = window.points.find(p => p.id === window.selectedPointIds[0]); if(!p) return;
-        document.getElementById('wrap-label').style.display = 'flex'; document.getElementById('prop-label').value = p.label || "";
-        document.getElementById('wrap-angle').style.display = 'flex'; document.getElementById('prop-label-angle').value = p.labelAngle !== undefined ? p.labelAngle : 90;
+        setDisplay('wrap-label', 'flex'); setValue('prop-label', p.label || "");
+        setDisplay('wrap-angle', 'flex'); setValue('prop-label-angle', p.labelAngle !== undefined ? p.labelAngle : 90);
         
         // NEW: Show radius for points
-        document.getElementById('wrap-radius').style.display = 'flex'; 
-        document.getElementById('prop-radius').value = p.radius !== undefined ? p.radius : 5; 
-        document.getElementById('lbl-radius').innerText = "Radius:";
+        setDisplay('wrap-radius', 'flex'); 
+        setValue('prop-radius', p.radius !== undefined ? p.radius : 5); 
+        let lblRadiusEl = el('lbl-radius'); if (lblRadiusEl) lblRadiusEl.innerText = "Radius:";
         
-        document.getElementById('wrap-p-style').style.display = 'flex'; document.getElementById('point-style').value = p.style;
-        document.getElementById('current-color').innerHTML = `<span class="color-box" style="background: ${window.getHexFromName(p.color)};"></span> ${p.color}`;
+        setDisplay('wrap-p-style', 'flex'); setValue('point-style', p.style);
+        setInner('current-color', `<span class="color-box" style="background: ${window.getHexFromName(p.color)};"></span> ${p.color}`);
     } else if (window.selectedEdgeIds.length > 0) {
         let e = window.edges.find(e => e.id === window.selectedEdgeIds[0]); if(!e) return;
-        document.getElementById('wrap-label').style.display = 'flex'; document.getElementById('prop-label').value = e.label || "";
-        document.getElementById('wrap-pos').style.display = 'flex'; document.getElementById('prop-label-pos').value = e.labelPos || "above";
-        if (['line', 'curve', 'loop', 'arc', 'elliptic-arc'].includes(e.type)) { document.getElementById('wrap-arrow').style.display = 'flex'; document.getElementById('prop-arrow').value = e.arrow || "none"; }
-        if (e.type === 'curve') { document.getElementById('wrap-offset').style.display = 'flex'; document.getElementById('prop-offset').value = e.offset; }
+        setDisplay('wrap-label', 'flex'); setValue('prop-label', e.label || "");
+        setDisplay('wrap-pos', 'flex'); setValue('prop-label-pos', e.labelPos || "above");
+        if (['line', 'curve', 'loop', 'arc', 'elliptic-arc'].includes(e.type)) { setDisplay('wrap-arrow', 'flex'); setValue('prop-arrow', e.arrow || "none"); }
+        if (e.type === 'curve') { setDisplay('wrap-offset', 'flex'); setValue('prop-offset', e.offset); }
         if (['arc', 'elliptic-arc', 'circle', 'loop'].includes(e.type)) {
-            document.getElementById('wrap-radius').style.display = 'flex'; document.getElementById('prop-radius').value = e.radius;
-            if (e.type === 'elliptic-arc') { document.getElementById('lbl-radius').innerText = "Axis(a):"; } else { document.getElementById('lbl-radius').innerText = "Radius:"; }
-            if (e.type === 'loop') { document.getElementById('wrap-loop-angle').style.display = 'flex'; document.getElementById('prop-loop-angle').value = e.loopAngle;
-            } else if (e.type !== 'circle') { document.getElementById('wrap-start').style.display = 'flex'; document.getElementById('prop-angle-start').value = e.startAngle; document.getElementById('wrap-end').style.display = 'flex'; document.getElementById('prop-angle-end').value = e.endAngle; }
+            setDisplay('wrap-radius', 'flex'); setValue('prop-radius', e.radius);
+            if (e.type === 'elliptic-arc') { let l = el('lbl-radius'); if (l) l.innerText = "Axis(a):"; } else { let l = el('lbl-radius'); if (l) l.innerText = "Radius:"; }
+            if (e.type === 'loop') { setDisplay('wrap-loop-angle', 'flex'); setValue('prop-loop-angle', e.loopAngle);
+            } else if (e.type !== 'circle') { setDisplay('wrap-start', 'flex'); setValue('prop-angle-start', e.startAngle); setDisplay('wrap-end', 'flex'); setValue('prop-angle-end', e.endAngle); }
         }
-        document.getElementById('wrap-l-style').style.display = 'flex'; document.getElementById('line-style').value = e.style;
-        document.getElementById('current-color').innerHTML = `<span class="color-box" style="background: ${window.getHexFromName(e.color)};"></span> ${e.color}`;
+        setDisplay('wrap-l-style', 'flex'); setValue('line-style', e.style);
+        setInner('current-color', `<span class="color-box" style="background: ${window.getHexFromName(e.color)};"></span> ${e.color}`);
     } else if (window.selectedTextIds.length > 0) {
         let t = window.texts.find(t => t.id === window.selectedTextIds[0]); if(!t) return;
-        document.getElementById('wrap-label').style.display = 'flex'; document.getElementById('prop-label').value = t.text || "";
-        document.getElementById('current-color').innerHTML = `<span class="color-box" style="background: ${window.getHexFromName(t.color)};"></span> ${t.color}`;
+        setDisplay('wrap-label', 'flex'); setValue('prop-label', t.text || "");
+        setInner('current-color', `<span class="color-box" style="background: ${window.getHexFromName(t.color)};"></span> ${t.color}`);
     } else if (window.selectedRegionIds.length > 0) {
         let r = window.regions.find(r => r.id === window.selectedRegionIds[0]); if(!r) return;
-        document.getElementById('current-color').innerHTML = `<span class="color-box" style="background: ${window.getHexFromName(r.color)};"></span> ${r.color}`;
+        setInner('current-color', `<span class="color-box" style="background: ${window.getHexFromName(r.color)};"></span> ${r.color}`);
     }
 }
 
@@ -562,8 +605,29 @@ canvas.addEventListener('mousedown', (e) => {
                 let newId = window.textIdCounter++; window.texts.push({ id: newId, x: m.x, y: m.y, text: input.value, color: window.activeColor });
                 window.selectedTextIds = [newId]; window.selectedPointIds = []; window.selectedEdgeIds = []; window.selectedRegionIds = []; setMode('select', true); saveState();
             }
-            input.remove(); draw();
+            try { if (input && input.isConnected) input.parentNode.removeChild(input); } catch(e) { console.error('Failed removing inline editor:', e); }
+            draw();
         };
+
+        // Close the inline editor when clicking outside or pressing Escape.
+        const outsideHandler = (ev) => {
+            if (!input) return;
+            if (ev.target === input) return; // clicking inside should not close
+            input.blur();
+        };
+        const escHandler = (ev) => { if (ev.key === 'Escape') input.blur(); };
+        // Use capture so outside clicks are detected before other handlers
+        document.addEventListener('mousedown', outsideHandler, true);
+        document.addEventListener('keydown', escHandler);
+
+        // Clean up listeners when the editor is removed
+        const cleanup = () => {
+            document.removeEventListener('mousedown', outsideHandler, true);
+            document.removeEventListener('keydown', escHandler);
+        };
+        // Wrap existing onblur to ensure cleanup runs
+        const origOnblur = input.onblur;
+        input.onblur = () => { try { origOnblur(); } finally { cleanup(); } };
     } 
     else if (['line', 'curve'].includes(currentMode) && pId !== null) {
         if (window.selectedPointIds.length === 0) { window.selectedPointIds = [pId]; window.selectedEdgeIds = []; window.selectedTextIds = []; window.selectedRegionIds = []; if (window.updatePropertyPanel) window.updatePropertyPanel(); }
@@ -853,7 +917,7 @@ window.draw = function() {
         ctx.restore();
     }
 
-    if (window.generateCode) window.generateCode();
+    if (window.requestGenerateCode) window.requestGenerateCode();
     updateHUD();
 };
 
