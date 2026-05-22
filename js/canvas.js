@@ -47,7 +47,9 @@ const resizeObserver = new ResizeObserver(entries => {
 resizeObserver.observe(document.getElementById('canvas-container'));
 
 window.points = []; window.edges = []; window.texts = []; window.regions = [];
+window.plots = [];
 window.pointIdCounter = 0; window.edgeIdCounter = 0; window.textIdCounter = 0; window.regionIdCounter = 0;
+window.plotIdCounter = 0;
 
 let historyState = []; let historyIndex = -1;
 
@@ -58,8 +60,8 @@ let lassoPath = [];
 window.saveState = function() {
     if (historyIndex < historyState.length - 1) historyState = historyState.slice(0, historyIndex + 1);
     historyState.push(JSON.stringify({
-        points: window.points, edges: window.edges, texts: window.texts, regions: window.regions,
-        pId: window.pointIdCounter, eId: window.edgeIdCounter, tId: window.textIdCounter, rId: window.regionIdCounter
+        points: window.points, edges: window.edges, texts: window.texts, regions: window.regions, plots: window.plots,
+        pId: window.pointIdCounter, eId: window.edgeIdCounter, tId: window.textIdCounter, rId: window.regionIdCounter, plId: window.plotIdCounter
     }));
     historyIndex++;
 };
@@ -67,8 +69,8 @@ window.saveState = function() {
 window.undo = function() {
     if (historyIndex > 0) {
         historyIndex--; let state = JSON.parse(historyState[historyIndex]);
-        window.points = state.points; window.edges = state.edges; window.texts = state.texts; window.regions = state.regions || [];
-        window.pointIdCounter = state.pId; window.edgeIdCounter = state.eId; window.textIdCounter = state.tId; window.regionIdCounter = state.rId || 0;
+        window.points = state.points; window.edges = state.edges; window.texts = state.texts; window.regions = state.regions || []; window.plots = state.plots || [];
+        window.pointIdCounter = state.pId; window.edgeIdCounter = state.eId; window.textIdCounter = state.tId; window.regionIdCounter = state.rId || 0; window.plotIdCounter = state.plId || 0;
         window.selectedPointIds = []; window.selectedEdgeIds = []; window.selectedTextIds = []; window.selectedRegionIds = []; updatePropertyPanel(); draw();
     }
 };
@@ -76,8 +78,8 @@ window.undo = function() {
 window.redo = function() {
     if (historyIndex < historyState.length - 1) {
         historyIndex++; let state = JSON.parse(historyState[historyIndex]);
-        window.points = state.points; window.edges = state.edges; window.texts = state.texts; window.regions = state.regions || [];
-        window.pointIdCounter = state.pId; window.edgeIdCounter = state.eId; window.textIdCounter = state.tId; window.regionIdCounter = state.rId || 0;
+        window.points = state.points; window.edges = state.edges; window.texts = state.texts; window.regions = state.regions || []; window.plots = state.plots || [];
+        window.pointIdCounter = state.pId; window.edgeIdCounter = state.eId; window.textIdCounter = state.tId; window.regionIdCounter = state.rId || 0; window.plotIdCounter = state.plId || 0;
         window.selectedPointIds = []; window.selectedEdgeIds = []; window.selectedTextIds = []; window.selectedRegionIds = []; updatePropertyPanel(); draw();
     }
 };
@@ -237,9 +239,9 @@ window.deleteSelected = function() {
 
 window.clearAll = function() {
     if(confirm("Are you sure you want to clear the entire graph?")) {
-        window.points = []; window.edges = []; window.texts = []; window.regions = [];
+        window.points = []; window.edges = []; window.texts = []; window.regions = []; window.plots = [];
         window.selectedPointIds = []; window.selectedEdgeIds = []; window.selectedTextIds = []; window.selectedRegionIds = [];
-        window.pointIdCounter = 0; window.edgeIdCounter = 0; window.textIdCounter = 0; window.regionIdCounter = 0;
+        window.pointIdCounter = 0; window.edgeIdCounter = 0; window.textIdCounter = 0; window.regionIdCounter = 0; window.plotIdCounter = 0;
         saveState(); updatePropertyPanel(); draw();
     }
 };
@@ -733,10 +735,236 @@ function drawArrowhead(ctx, x, y, angle, color) {
     ctx.lineTo(x - 12 * Math.cos(angle + Math.PI/6), y - 12 * Math.sin(angle + Math.PI/6)); ctx.fill();
 }
 
+function parsePlotTable(text, mode) {
+    const rows = text
+        .split(/\r?\n/)
+        .map(line => line.trim())
+        .filter(line => line && !line.startsWith('#'))
+        .map(line => line.split(/[\t,; ]+/).filter(Boolean));
+
+    if (rows.length < 2) return null;
+
+    const headers = rows[0];
+    const dataRows = rows.slice(1);
+    const series = [];
+
+    if (mode === 'paired') {
+        for (let i = 0; i + 1 < headers.length; i += 2) {
+            const points = [];
+            dataRows.forEach(row => {
+                const x = parseFloat(row[i]);
+                const y = parseFloat(row[i + 1]);
+                if (Number.isFinite(x) && Number.isFinite(y)) points.push({ x, y });
+            });
+            if (points.length > 0) {
+                series.push({
+                    name: headers[i + 1] || `Series ${series.length + 1}`,
+                    x: points.map(p => p.x),
+                    y: points.map(p => p.y),
+                });
+            }
+        }
+    } else {
+        const xValues = [];
+        const yColumns = headers.slice(1);
+        const ySeries = yColumns.map(name => ({ name: name || `Series ${series.length + 1}`, y: [], x: [] }));
+        dataRows.forEach(row => {
+            const x = parseFloat(row[0]);
+            if (!Number.isFinite(x)) return;
+            xValues.push(x);
+            ySeries.forEach((s, idx) => {
+                const y = parseFloat(row[idx + 1]);
+                if (Number.isFinite(y)) {
+                    s.x.push(x);
+                    s.y.push(y);
+                }
+            });
+        });
+        ySeries.forEach(s => { if (s.x.length > 0) series.push(s); });
+    }
+
+    if (series.length === 0) return null;
+
+    const allX = series.flatMap(s => s.x);
+    const allY = series.flatMap(s => s.y);
+    const xMin = Math.min(...allX);
+    const xMax = Math.max(...allX);
+    const yMin = Math.min(...allY);
+    const yMax = Math.max(...allY);
+
+    return {
+        id: window.plotIdCounter++,
+        mode,
+        title: (document.getElementById('plot-title')?.value || '').trim(),
+        xlabel: (document.getElementById('plot-xlabel')?.value || '').trim() || 'x',
+        ylabel: (document.getElementById('plot-ylabel')?.value || '').trim() || 'y',
+        series,
+        bounds: {
+            xMin: xMin === xMax ? xMin - 1 : xMin,
+            xMax: xMin === xMax ? xMax + 1 : xMax,
+            yMin: yMin === yMax ? yMin - 1 : yMin,
+            yMax: yMin === yMax ? yMax + 1 : yMax,
+        },
+    };
+}
+
+function getPlotPalette() {
+    return ['#0056b3', '#d63384', '#20c997', '#fd7e14', '#6f42c1', '#198754', '#dc3545', '#0d6efd'];
+}
+
+function renderPlotCanvas() {
+    const plotCanvas = document.getElementById('plotCanvas');
+    if (!plotCanvas) return;
+    const plotCtx = plotCanvas.getContext('2d');
+    const hasPlot = window.plots && window.plots.length > 0;
+    plotCanvas.style.display = hasPlot ? 'block' : 'none';
+    if (!hasPlot) {
+        plotCtx.clearRect(0, 0, plotCanvas.width, plotCanvas.height);
+        return;
+    }
+
+    const width = canvasWidth;
+    const height = canvasHeight;
+    plotCanvas.width = width * dpr;
+    plotCanvas.height = height * dpr;
+    plotCanvas.style.width = width + 'px';
+    plotCanvas.style.height = height + 'px';
+    plotCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    plotCtx.clearRect(0, 0, width, height);
+
+    const plot = window.plots[0];
+    const box = { x: width * 0.12, y: height * 0.12, w: width * 0.76, h: height * 0.76 };
+    const pad = 42;
+    const left = box.x + pad;
+    const top = box.y + pad * 0.8;
+    const right = box.x + box.w - 18;
+    const bottom = box.y + box.h - 32;
+    const chartW = right - left;
+    const chartH = bottom - top;
+
+    plotCtx.fillStyle = 'rgba(255,255,255,0.92)';
+    plotCtx.strokeStyle = 'rgba(0,0,0,0.15)';
+    plotCtx.lineWidth = 1;
+    plotCtx.beginPath();
+    if (plotCtx.roundRect) plotCtx.roundRect(box.x, box.y, box.w, box.h, 18); else plotCtx.rect(box.x, box.y, box.w, box.h);
+    plotCtx.fill();
+    plotCtx.stroke();
+
+    if (plot.title) {
+        plotCtx.fillStyle = '#111';
+        plotCtx.font = '600 16px sans-serif';
+        plotCtx.textAlign = 'center';
+        plotCtx.fillText(plot.title, box.x + box.w / 2, box.y + 22);
+    }
+
+    const xMin = plot.bounds.xMin;
+    const xMax = plot.bounds.xMax;
+    const yMin = plot.bounds.yMin;
+    const yMax = plot.bounds.yMax;
+    const xSpan = xMax - xMin;
+    const ySpan = yMax - yMin;
+    const xToPx = (x) => left + ((x - xMin) / xSpan) * chartW;
+    const yToPx = (y) => bottom - ((y - yMin) / ySpan) * chartH;
+
+    plotCtx.strokeStyle = 'rgba(0,0,0,0.08)';
+    plotCtx.lineWidth = 1;
+    for (let i = 0; i <= 5; i++) {
+        const gx = left + (chartW * i) / 5;
+        const gy = top + (chartH * i) / 5;
+        plotCtx.beginPath(); plotCtx.moveTo(gx, top); plotCtx.lineTo(gx, bottom); plotCtx.stroke();
+        plotCtx.beginPath(); plotCtx.moveTo(left, gy); plotCtx.lineTo(right, gy); plotCtx.stroke();
+    }
+
+    plotCtx.strokeStyle = '#111';
+    plotCtx.lineWidth = 1.5;
+    plotCtx.beginPath(); plotCtx.moveTo(left, bottom); plotCtx.lineTo(right, bottom); plotCtx.stroke();
+    plotCtx.beginPath(); plotCtx.moveTo(left, top); plotCtx.lineTo(left, bottom); plotCtx.stroke();
+
+    plotCtx.font = '12px sans-serif';
+    plotCtx.fillStyle = '#333';
+    plotCtx.textAlign = 'center';
+    plotCtx.fillText(plot.xlabel, left + chartW / 2, box.y + box.h - 10);
+    plotCtx.save();
+    plotCtx.translate(box.x + 16, top + chartH / 2);
+    plotCtx.rotate(-Math.PI / 2);
+    plotCtx.fillText(plot.ylabel, 0, 0);
+    plotCtx.restore();
+
+    const palette = getPlotPalette();
+    plot.series.forEach((series, index) => {
+        const color = palette[index % palette.length];
+        plotCtx.strokeStyle = color;
+        plotCtx.fillStyle = color;
+        plotCtx.lineWidth = 2.2;
+        plotCtx.beginPath();
+        series.x.forEach((x, pointIndex) => {
+            const px = xToPx(x);
+            const py = yToPx(series.y[pointIndex]);
+            if (pointIndex === 0) plotCtx.moveTo(px, py); else plotCtx.lineTo(px, py);
+        });
+        plotCtx.stroke();
+
+        series.x.forEach((x, pointIndex) => {
+            const px = xToPx(x);
+            const py = yToPx(series.y[pointIndex]);
+            plotCtx.beginPath();
+            plotCtx.arc(px, py, 3.5, 0, Math.PI * 2);
+            plotCtx.fill();
+        });
+    });
+}
+
+window.generatePlotFromTable = function() {
+    const table = document.getElementById('plot-table');
+    const mode = document.getElementById('plot-mode').value;
+    const plot = parsePlotTable(table ? table.value : '', mode);
+    if (!plot) {
+        window.plots = [];
+        renderPlotCanvas();
+        draw();
+        return;
+    }
+    window.plots = [plot];
+    saveState();
+    renderPlotCanvas();
+    draw();
+};
+
+window.clearPlot = function() {
+    window.plots = [];
+    renderPlotCanvas();
+    saveState();
+    draw();
+};
+
+window.generateMatplotlibCode = function() {
+    if (!window.plots || window.plots.length === 0) return '# Add plot data and click Render Plot to generate Matplotlib code.';
+    const plot = window.plots[0];
+    const lines = [];
+    lines.push('import matplotlib.pyplot as plt');
+    lines.push('');
+    plot.series.forEach((series, index) => {
+        const label = series.name ? JSON.stringify(series.name) : JSON.stringify(`Series ${index + 1}`);
+        lines.push(`x${index + 1} = ${JSON.stringify(series.x)}`);
+        lines.push(`y${index + 1} = ${JSON.stringify(series.y)}`);
+        lines.push(`plt.plot(x${index + 1}, y${index + 1}, marker='o', linewidth=2, label=${label})`);
+        lines.push('');
+    });
+    if (plot.title) lines.push(`plt.title(${JSON.stringify(plot.title)})`);
+    lines.push(`plt.xlabel(${JSON.stringify(plot.xlabel || 'x')})`);
+    lines.push(`plt.ylabel(${JSON.stringify(plot.ylabel || 'y')})`);
+    lines.push('plt.grid(True, alpha=0.3)');
+    lines.push('plt.legend()');
+    lines.push('plt.tight_layout()');
+    lines.push('plt.show()');
+    return lines.join('\n');
+};
+
 window.draw = function() {
     ctx.clearRect(0, 0, canvasWidth, canvasHeight);
     let u = getUnitSize();
     document.querySelectorAll('.math-overlay').forEach(el => el.remove());
+    renderPlotCanvas();
 
     let isDark = document.body.classList.contains('dark-mode');
 
@@ -993,15 +1221,16 @@ window.exportImage = async function() {
 
 window.exportJSON = function() {
     let a = document.createElement('a'); a.download = "graph_data.json";
-    a.href = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({points: window.points, edges: window.edges, texts: window.texts, regions: window.regions, originX, originY, zoom: window.zoom}, null, 2)); a.click();
+    a.href = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({points: window.points, edges: window.edges, texts: window.texts, regions: window.regions, plots: window.plots, originX, originY, zoom: window.zoom}, null, 2)); a.click();
 }
 window.importJSON = function(e) {
     let reader = new FileReader();
     reader.onload = function(ev) {
-        let obj = JSON.parse(ev.target.result); window.points = obj.points || []; window.edges = obj.edges || []; window.texts = obj.texts || []; window.regions = obj.regions || [];
+        let obj = JSON.parse(ev.target.result); window.points = obj.points || []; window.edges = obj.edges || []; window.texts = obj.texts || []; window.regions = obj.regions || []; window.plots = obj.plots || [];
         if (obj.originX !== undefined) originX = obj.originX; if (obj.originY !== undefined) originY = obj.originY; if (obj.zoom !== undefined) window.zoom = obj.zoom;
         window.pointIdCounter = window.points.length ? Math.max(...window.points.map(p=>p.id))+1 : 0; window.edgeIdCounter = window.edges.length ? Math.max(...window.edges.map(e=>e.id))+1 : 0; 
-        window.textIdCounter = window.texts.length ? Math.max(...window.texts.map(t=>t.id))+1 : 0; window.regionIdCounter = window.regions.length ? Math.max(...window.regions.map(r=>r.id))+1 : 0;
+        window.textIdCounter = window.texts.length ? Math.max(...window.texts.map(t=>t.id))+1 : 0; window.regionIdCounter = window.regions.length ? Math.max(...window.regions.map(r=>r.id))+1 : 0; window.plotIdCounter = window.plots.length ? Math.max(...window.plots.map(pl=>pl.id))+1 : 0;
+        renderPlotCanvas();
         saveState(); draw();
     }; reader.readAsText(e.target.files[0]);
 }

@@ -120,6 +120,7 @@
         <div id="left-panel">
             <div id="canvas-container">
                 <canvas id="graphCanvas" tabindex="0" title="Graph Drawing Area"></canvas>
+                <canvas id="plotCanvas" aria-hidden="true" style="position: absolute; inset: 0; pointer-events: none; z-index: 5; display: none;"></canvas>
                 <div id="graph-hud">
                     <div><strong>|V|</strong> (Order): <span id="hud-v">0</span></div>
                     <div><strong>|E|</strong> (Size): <span id="hud-e">0</span></div>
@@ -146,12 +147,30 @@
                         <option value="pstricks">PSTricks</option>
                         <option value="tikz">TikZ</option>
                         <option value="matrix">Matrices (A, D, L)</option>
+                        <option value="matplotlib">Matplotlib</option>
                         <option value="python">Python (NetworkX)</option>
                         <option value="sage">SageMath</option>
                         <option value="mathematica">Mathematica</option>
                         <option value="matlab">MATLAB</option>
                     </select>
                     
+                </div>
+            </div>
+            <div class="tool-group" style="margin-top: 8px; align-items: flex-start; flex-direction: column; gap: 6px; width: 100%;">
+                <strong style="color: #0056b3;">XY Plot Table:</strong>
+                <div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center; width: 100%;">
+                    <select id="plot-mode" title="Choose plot table mode">
+                        <option value="shared-x">One x column, many y series</option>
+                        <option value="paired">Several x-y plots in one table</option>
+                    </select>
+                    <input id="plot-title" type="text" placeholder="Title" style="width: 120px;">
+                    <input id="plot-xlabel" type="text" placeholder="X label" style="width: 90px;">
+                    <input id="plot-ylabel" type="text" placeholder="Y label" style="width: 90px;">
+                </div>
+                <textarea id="plot-table" placeholder="shared-x example:\nx, y1, y2\n0, 1, 2\n1, 3, 4\n2, 5, 8" style="width: 100%; min-height: 92px; resize: vertical;"></textarea>
+                <div style="display: flex; gap: 6px;">
+                    <button onclick="generatePlotFromTable()" style="background: #0056b3; color: white; border-color: #004494; font-weight: bold;">Render Plot</button>
+                    <button onclick="clearPlot()" style="background: #6c757d; color: white; border-color: #5a6268;">Clear Plot</button>
                 </div>
             </div>
             <textarea id="codeOutput" readonly title="Copy this code into your LaTeX document"></textarea>
@@ -198,6 +217,23 @@
                         <li><span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 5px; color: #dc3545; font-size: 18px;">ink_eraser</span> <kbd class="hk">Del</kbd> <b>Eraser:</b> Click items to delete. (Or press 'Delete' key).</li>
                         <li><span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 5px; color: #fd7e14; font-size: 18px;">mouse</span> <b>Right-Click Menu:</b> Right-click any node or selected cluster to instantly open the Quick Edit color/delete menu.</li>
                     </ul>
+
+                    <h3 style="color: #0056b3; margin-bottom: 10px; border-bottom: 2px solid #eef2f5; padding-bottom: 5px; margin-top: 25px;">📈 XY Plot Table Examples</h3>
+                    <ul style="line-height: 1.8; list-style: none; padding-left: 0; margin-top: 0; font-size: 14px;">
+                        <li><b>One x column, many y series:</b> Use one shared x column and one column per series.
+                            <pre style="white-space: pre-wrap; background: #f8f9fb; border: 1px solid #e1e5ea; padding: 8px; border-radius: 6px; margin: 6px 0 0;">x, y1, y2
+0, 1, 2
+1, 3, 4
+2, 5, 8</pre>
+                        </li>
+                        <li style="margin-top: 10px;"><b>Several x-y plots in one table:</b> Use column pairs like <code>x1, y1, x2, y2</code>, then fill the rows.
+                            <pre style="white-space: pre-wrap; background: #f8f9fb; border: 1px solid #e1e5ea; padding: 8px; border-radius: 6px; margin: 6px 0 0;">x1, y1, x2, y2
+0, 1, 0, 2
+1, 3, 1, 4
+2, 5, 2, 8</pre>
+                        </li>
+                        <li style="margin-top: 10px;">Use commas, spaces, or semicolons as separators. The first row is treated as labels.</li>
+                    </ul>
                 </div>
 
                 <div style="flex: 1; min-width: 300px;">
@@ -222,6 +258,7 @@
                     <h3 style="color: #0056b3; margin-bottom: 10px; border-bottom: 2px solid #eef2f5; padding-bottom: 5px; margin-top: 25px;">💾 Output & Export</h3>
                     <ul style="line-height: 1.8; list-style: none; padding-left: 0; margin-top: 0; font-size: 14px;">
                         <li><b>TikZ / PSTricks:</b> Standard LaTeX graphics packages.</li>
+                        <li><b>XY Plot Table:</b> Paste a small CSV-like table, choose a mode, then click <b>Render Plot</b> to preview the chart and generate Matplotlib code.</li>
                         <li><b>Matrices:</b> Auto-maps nodes to formulate the Adjacency ($A$), Degree ($D$), and Laplacian ($L$) matrices in LaTeX.</li>
                         <li><b>Code/Scripts:</b> Outputs ready-to-run edge lists for <b>Python (NetworkX)</b>, <b>SageMath</b>, <b>Mathematica</b>, and <b>MATLAB</b>.</li>
                         <li><b>Image:</b> Download a transparent, print-ready PNG (automatically handles dark/light mode inversion).</li>

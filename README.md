@@ -72,6 +72,8 @@ Access the generated code from the right-hand panel.
 5. **Image:** Export a high-resolution, transparent PNG.
 6. **Save/Load JSON:** Save your active workspace locally and pick up right where you left off.
 
+TikZ and PSTricks exports deduplicate repeated node and edge styles so the generated LaTeX stays smaller and easier to edit.
+
 ---
 
 ## 🚀 Getting Started
