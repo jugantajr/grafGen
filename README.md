@@ -72,6 +72,32 @@ Access the generated code from the right-hand panel.
 5. **Image:** Export a high-resolution, transparent PNG.
 6. **Save/Load JSON:** Save your active workspace locally and pick up right where you left off.
 
+## 📈 XY Plot Table
+
+grafGen also supports simple XY plot tables for chart previewing and Matplotlib export.
+
+Choose one of these modes in the plot panel:
+
+* **One x column, many y series:** One shared x column with one or more y columns.
+
+```text
+x, y1, y2
+0, 1, 2
+1, 3, 4
+2, 5, 8
+```
+
+* **Several x-y plots in one table:** Use x-y column pairs in the same table.
+
+```text
+x1, y1, x2, y2
+0, 1, 0, 2
+1, 3, 1, 4
+2, 5, 2, 8
+```
+
+Use commas, spaces, or semicolons as separators, then click **Render Plot** to preview the chart and generate Matplotlib code.
+
 TikZ and PSTricks exports deduplicate repeated node and edge styles so the generated LaTeX stays smaller and easier to edit.
 
 ---
