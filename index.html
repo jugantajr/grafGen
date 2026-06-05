@@ -15,30 +15,35 @@
 <body>
     <div id="toolbar">
         <div class="toolbar-row">
-            <div class="tool-group" style="padding-right: 15px;">
-                <div style="font-size: 18px; font-weight: 800; color: #0056b3; display: flex; align-items: center; gap: 6px; letter-spacing: 0.5px;">
-                    <span class="material-symbols-outlined" style="font-size: 24px;">timeline</span>
-                    grafGen
+                <div class="tool-group" style="padding-right: 15px;">
+                    <div class="brand">
+                        <span class="material-symbols-outlined">timeline</span>
+                        grafGen
+                    </div>
+                </div>
+            <div class="tool-group">
+                <div id="toolbar-actions" class="toolbar-actions">
+                <button onclick="toggleTheme()" title="Toggle Dark/Light Mode" class="icon-btn" id="theme-btn" data-toolbar-id="theme-btn"><span class="material-symbols-outlined">dark_mode</span><span class="drag-handle material-symbols-outlined" aria-hidden="true">drag_indicator</span></button>
+                <button id="undo-btn" onclick="undo()" title="Undo (Ctrl+Z)" class="icon-btn" data-toolbar-id="undo-btn"><span class="material-symbols-outlined">undo</span><span class="drag-handle material-symbols-outlined" aria-hidden="true">drag_indicator</span></button>
+                <button id="redo-btn" onclick="redo()" title="Redo (Ctrl+Y)" class="icon-btn" data-toolbar-id="redo-btn"><span class="material-symbols-outlined">redo</span><span class="drag-handle material-symbols-outlined" aria-hidden="true">drag_indicator</span></button>
+                <button id="layout-btn" onclick="toggleLayout()" title="Switch layout for mobile" class="icon-btn btn-muted" data-toolbar-id="layout-btn"><span class="material-symbols-outlined">swap_vert</span><span class="drag-handle material-symbols-outlined" aria-hidden="true">drag_indicator</span></button>
+                <button id="clear-btn" onclick="clearAll()" title="Clear entire canvas" class="danger icon-btn btn-danger" data-toolbar-id="clear-btn"><span class="material-symbols-outlined">delete_sweep</span><span class="drag-handle material-symbols-outlined" aria-hidden="true">drag_indicator</span></button>
+
+                <button id="untangle-btn" onclick="untangleGraph()" title="Untangle (Physics Auto-Layout)" class="icon-btn btn-purple" data-toolbar-id="untangle-btn"><span class="material-symbols-outlined">auto_fix_high</span><span class="drag-handle material-symbols-outlined" aria-hidden="true">drag_indicator</span></button>
+
+                <button id="autocolor-btn" onclick="autoColorGraph()" title="Greedy Auto-Color (Estimate Chromatic Number)" class="icon-btn btn-pink" data-toolbar-id="autocolor-btn"><span class="material-symbols-outlined">palette</span><span class="drag-handle material-symbols-outlined" aria-hidden="true">drag_indicator</span></button>
+                <button id="snap-btn" onclick="snapBipartite()" title="Snap to Bipartite (Or find odd cycle)" class="icon-btn" data-toolbar-id="snap-btn"><span class="material-symbols-outlined">call_split</span><span class="drag-handle material-symbols-outlined" aria-hidden="true">drag_indicator</span></button>
+
+                <button id="help-btn" onclick="openInstructions()" title="View Instructions" class="icon-btn btn-teal" data-toolbar-id="help-btn"><span class="material-symbols-outlined">help</span><span class="drag-handle material-symbols-outlined" aria-hidden="true">drag_indicator</span></button>
+                <button id="about-btn" onclick="openAbout()" title="About grafGen" class="icon-btn btn-muted" data-toolbar-id="about-btn"><span class="material-symbols-outlined">info</span><span class="drag-handle material-symbols-outlined" aria-hidden="true">drag_indicator</span></button>
+
+                <button id="toolbar-toggle" class="icon-btn" title="Collapse toolbar" onclick="toggleToolbar()"><span class="material-symbols-outlined">menu</span></button>
+                <button id="toolbar-customize-btn" class="icon-btn" title="Customize toolbar" onclick="openToolbarCustomizer()"><span class="material-symbols-outlined">settings</span></button>
                 </div>
             </div>
             <div class="tool-group">
-                <button onclick="toggleTheme()" title="Toggle Dark/Light Mode" class="icon-btn" id="theme-btn"><span class="material-symbols-outlined">dark_mode</span></button>
-                <button onclick="undo()" title="Undo (Ctrl+Z)" class="icon-btn"><span class="material-symbols-outlined">undo</span></button>
-                <button onclick="redo()" title="Redo (Ctrl+Y)" class="icon-btn"><span class="material-symbols-outlined">redo</span></button>
-                <button onclick="toggleLayout()" title="Switch layout for mobile" class="icon-btn" style="background: #343a40; color: white;"><span class="material-symbols-outlined">swap_vert</span></button>
-                <button onclick="clearAll()" title="Clear entire canvas" class="danger icon-btn" style="background: #ff0101; color: white;"><span class="material-symbols-outlined">delete_sweep</span></button>
-                
-                <button onclick="untangleGraph()" title="Untangle (Physics Auto-Layout)" class="icon-btn" style="background: #6f42c1; color: white; border-color: #59339d; margin-left: 5px;"><span class="material-symbols-outlined">auto_fix_high</span></button>
-                
-                <button onclick="autoColorGraph()" title="Greedy Auto-Color (Estimate Chromatic Number)" class="icon-btn" style="background: #e83e8c; color: white; border-color: #d63384; margin-left: 5px;"><span class="material-symbols-outlined">palette</span></button>
-                <button onclick="snapBipartite()" title="Snap to Bipartite (Or find odd cycle)" class="icon-btn" style="background: #20c997; color: white; border-color: #1aa179; margin-left: 5px;"><span class="material-symbols-outlined">call_split</span></button>
-                
-                <button onclick="openInstructions()" title="View Instructions" class="icon-btn" style="background: #17a2b8; color: white; border-color: #117a8b; margin-left: 5px;"><span class="material-symbols-outlined">help</span></button>
-                <button onclick="openAbout()" title="About grafGen" class="icon-btn" style="background: #6c757d; color: white; border-color: #5a6268; margin-left: 5px;"><span class="material-symbols-outlined">info</span></button>
-            </div>
-            <div class="tool-group">
-                <button onclick="zoomIn()" title="Zoom In (+)" class="icon-btn"><span class="material-symbols-outlined">zoom_in</span></button>
-                <button onclick="zoomOut()" title="Zoom Out (-)" class="icon-btn"><span class="material-symbols-outlined">zoom_out</span></button>
+                <button id="zoom-in-btn" onclick="zoomIn()" title="Zoom In (+)" class="icon-btn" data-toolbar-id="zoom-in-btn"><span class="material-symbols-outlined">zoom_in</span></button>
+                <button id="zoom-out-btn" onclick="zoomOut()" title="Zoom Out (-)" class="icon-btn" data-toolbar-id="zoom-out-btn"><span class="material-symbols-outlined">zoom_out</span></button>
                 <label title="Show/hide grid"><input type="checkbox" id="toggle-grid" checked onchange="draw()"> Grid</label>
                 <label title="Show/hide coordinate axes"><input type="checkbox" id="toggle-axes" checked onchange="draw()"> Axes</label>
                 <label title="Snap to grid intersections"><input type="checkbox" id="snap-grid" checked> Snap</label>
@@ -75,6 +80,15 @@
                 <div class="custom-select" id="color-picker" title="Change active drawing/painting color" style="margin-left: 5px;">
                     <div class="select-selected" id="current-color"><span class="color-box" style="background: Black;"></span> Black</div>
                     <div class="select-items select-hide" id="color-list"></div>
+                </div>
+            </div>
+
+            <div id="toolbar-customizer">
+                <h4>Toolbar Customization</h4>
+                <div id="toolbar-customizer-list"></div>
+                <div style="display:flex; gap:8px; margin-top:8px; justify-content:flex-end;">
+                    <button onclick="saveToolbarConfig()" class="icon-btn btn-strong">Save</button>
+                    <button onclick="resetToolbarConfig()" class="icon-btn">Reset</button>
                 </div>
             </div>
 

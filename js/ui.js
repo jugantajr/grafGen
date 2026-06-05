@@ -133,29 +133,57 @@ window.addEventListener('click', function(event) {
 // ==========================================
 // THEME TOGGLE (Light / Dark Mode)
 // ==========================================
-window.toggleTheme = function() {
-    document.body.classList.toggle('dark-mode');
-    let isDark = document.body.classList.contains('dark-mode');
-    
-    // Save preference to browser storage
-    localStorage.setItem('prograph_theme', isDark ? 'dark' : 'light');
-    
-    // Swap the icon
-    let icon = document.querySelector('#theme-btn .material-symbols-outlined');
+// THEMING: support 'light', 'dark', and 'auto' (follow system)
+function applyThemeMode(mode) {
+    const body = document.body;
+    if (mode === 'dark') {
+        body.classList.add('dark-mode');
+    } else if (mode === 'light') {
+        body.classList.remove('dark-mode');
+    } else if (mode === 'auto') {
+        // follow system
+        const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        body.classList.toggle('dark-mode', prefersDark);
+    }
+
+    // Update icon label on button
+    const icon = document.querySelector('#theme-btn .material-symbols-outlined');
     if (icon) {
-        icon.innerText = isDark ? 'light_mode' : 'dark_mode';
+        if (mode === 'dark') icon.innerText = 'light_mode';
+        else if (mode === 'light') icon.innerText = 'dark_mode';
+        else icon.innerText = 'monitor';
     }
 
     if (typeof draw === 'function') draw();
+}
+
+function setThemeMode(mode, persist = true) {
+    if (!['light','dark','auto'].includes(mode)) mode = 'auto';
+    applyThemeMode(mode);
+    if (persist) localStorage.setItem('prograph_theme', mode);
+}
+
+// Toggle cycles light -> dark -> auto -> light
+window.toggleTheme = function() {
+    const cur = localStorage.getItem('prograph_theme') || 'light';
+    const order = ['light','dark','auto'];
+    let idx = order.indexOf(cur);
+    idx = (idx + 1) % order.length;
+    setThemeMode(order[idx]);
 };
 
-// Check for saved theme on load
+// Listen to system changes when in auto
+if (window.matchMedia) {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    mq.addEventListener && mq.addEventListener('change', (e) => {
+        if ((localStorage.getItem('prograph_theme') || 'light') === 'auto') applyThemeMode('auto');
+    });
+}
+
+// initialize theme on load
 window.addEventListener('DOMContentLoaded', () => {
-    if (localStorage.getItem('prograph_theme') === 'dark') {
-        document.body.classList.add('dark-mode');
-        let icon = document.querySelector('#theme-btn .material-symbols-outlined');
-        if (icon) icon.innerText = 'light_mode';
-    }
+    const saved = localStorage.getItem('prograph_theme') || 'light';
+    setThemeMode(saved, false);
 });
 window.copyCode = function() {
     const codeBox = document.getElementById('codeOutput');
@@ -175,3 +203,168 @@ window.copyCode = function() {
         }, 1500);
     });
 };
+
+// ==========================================
+// COLLAPSIBLE TOOLBAR + CUSTOMIZER
+// ==========================================
+window.toggleToolbar = function() {
+    const tb = document.getElementById('toolbar');
+    tb.classList.toggle('collapsed');
+    const collapsed = tb.classList.contains('collapsed');
+    localStorage.setItem('prograph_toolbar_collapsed', collapsed ? '1' : '0');
+    // update toggle icon
+    const tbtn = document.getElementById('toolbar-toggle');
+    if (tbtn) {
+        const icon = tbtn.querySelector('.material-symbols-outlined');
+        if (icon) icon.innerText = collapsed ? 'menu' : 'menu_open';
+        tbtn.title = collapsed ? 'Expand toolbar' : 'Collapse toolbar';
+    }
+};
+
+window.openToolbarCustomizer = function() {
+    const panel = document.getElementById('toolbar-customizer');
+    if (!panel) return;
+    // Build list dynamically if empty
+    const list = document.getElementById('toolbar-customizer-list');
+    if (list && list.children.length === 0) buildCustomizerList();
+    panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+};
+
+function buildCustomizerList() {
+    const list = document.getElementById('toolbar-customizer-list');
+    if (!list) return;
+    list.innerHTML = '';
+    const items = document.querySelectorAll('[data-toolbar-id]');
+    const config = JSON.parse(localStorage.getItem('prograph_toolbar_config') || '{}');
+    items.forEach(el => {
+        const id = el.getAttribute('data-toolbar-id');
+        const label = el.title || el.getAttribute('aria-label') || id;
+        const wrapper = document.createElement('label');
+        const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = (id in config) ? config[id] : true;
+        cb.addEventListener('change', () => {
+            applyToolbarConfig({ [id]: cb.checked });
+        });
+        wrapper.appendChild(cb);
+        const span = document.createElement('span'); span.textContent = ' ' + label;
+        wrapper.appendChild(span);
+        list.appendChild(wrapper);
+    });
+}
+
+function applyToolbarConfig(delta) {
+    const config = JSON.parse(localStorage.getItem('prograph_toolbar_config') || '{}');
+    Object.assign(config, delta || {});
+    Object.keys(config).forEach(id => {
+        const el = document.querySelector(`[data-toolbar-id="${id}"]`);
+        if (el) el.style.display = config[id] ? '' : 'none';
+    });
+}
+
+window.saveToolbarConfig = function() {
+    const items = document.querySelectorAll('[data-toolbar-id]');
+    const cfg = {};
+    items.forEach(el => cfg[el.getAttribute('data-toolbar-id')] = (el.style.display !== 'none'));
+    localStorage.setItem('prograph_toolbar_config', JSON.stringify(cfg));
+    const panel = document.getElementById('toolbar-customizer'); if (panel) panel.style.display = 'none';
+};
+
+window.resetToolbarConfig = function() {
+    localStorage.removeItem('prograph_toolbar_config');
+    // show all
+    document.querySelectorAll('[data-toolbar-id]').forEach(el => el.style.display = '');
+    const list = document.getElementById('toolbar-customizer-list'); if (list) list.innerHTML = '';
+};
+
+function loadToolbarState() {
+    const tb = document.getElementById('toolbar');
+    if (!tb) return;
+    if (localStorage.getItem('prograph_toolbar_collapsed') === '1') tb.classList.add('collapsed');
+    const cfg = JSON.parse(localStorage.getItem('prograph_toolbar_config') || '{}');
+    if (Object.keys(cfg).length) {
+        Object.keys(cfg).forEach(id => {
+            const el = document.querySelector(`[data-toolbar-id="${id}"]`);
+            if (el) el.style.display = cfg[id] ? '' : 'none';
+        });
+    }
+}
+
+// Drag-and-drop reordering for toolbar
+function initToolbarDrag() {
+    const container = document.getElementById('toolbar-actions');
+    if (!container) return;
+
+    let dragEl = null;
+
+    container.querySelectorAll('[data-toolbar-id]').forEach(btn => {
+        btn.setAttribute('draggable', 'true');
+
+        btn.addEventListener('dragstart', (e) => {
+            dragEl = btn;
+            btn.classList.add('dragging');
+            // show a nicer drag image (clone)
+            try {
+                const crt = btn.cloneNode(true);
+                crt.style.position = 'absolute'; crt.style.top = '-9999px'; crt.style.left = '-9999px';
+                document.body.appendChild(crt);
+                e.dataTransfer.setDragImage(crt, 16, 16);
+                setTimeout(() => document.body.removeChild(crt), 0);
+            } catch (err) {}
+            e.dataTransfer.effectAllowed = 'move';
+        });
+
+        btn.addEventListener('dragend', () => {
+            if (dragEl) dragEl.classList.remove('dragging');
+            dragEl = null;
+            saveToolbarOrder();
+        });
+    });
+
+    container.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        const after = getDragAfterElement(container, e.clientX);
+        const dragging = container.querySelector('.dragging');
+        if (!dragging) return;
+        if (after == null) container.appendChild(dragging);
+        else container.insertBefore(dragging, after);
+    });
+}
+
+function getDragAfterElement(container, x) {
+    const draggableElements = [...container.querySelectorAll('[data-toolbar-id]:not(.dragging)')];
+    return draggableElements.reduce((closest, child) => {
+        const box = child.getBoundingClientRect();
+        const offset = x - box.left - box.width / 2;
+        if (offset < 0 && offset > closest.offset) {
+            return { offset: offset, element: child };
+        } else return closest;
+    }, { offset: Number.NEGATIVE_INFINITY }).element || null;
+}
+
+function saveToolbarOrder() {
+    const container = document.getElementById('toolbar-actions');
+    if (!container) return;
+    const ids = [...container.querySelectorAll('[data-toolbar-id]')].map(el => el.getAttribute('data-toolbar-id'));
+    localStorage.setItem('prograph_toolbar_order', JSON.stringify(ids));
+}
+
+function loadToolbarOrder() {
+    const order = JSON.parse(localStorage.getItem('prograph_toolbar_order') || '[]');
+    if (!order.length) return;
+    const container = document.getElementById('toolbar-actions');
+    if (!container) return;
+    order.forEach(id => {
+        const el = container.querySelector(`[data-toolbar-id="${id}"]`);
+        if (el) container.appendChild(el);
+    });
+}
+
+// Wire drag init after DOM ready
+window.addEventListener('DOMContentLoaded', () => {
+    loadToolbarOrder();
+    initToolbarDrag();
+});
+
+window.addEventListener('DOMContentLoaded', () => {
+    // build color picker etc. already wired — load toolbar state after DOM ready
+    loadToolbarState();
+});
