@@ -86,10 +86,210 @@ window.redo = function() {
 
 let currentMode = 'point'; 
 window.selectedPointIds = []; window.selectedEdgeIds = []; window.selectedTextIds = []; window.selectedRegionIds = [];
+window._selectionClipboard = null;
 
 let isDragging = false; let draggedPointId = null; let draggedTextId = null; let draggedRegionId = null; let lastDragMath = null; 
 let isPanning = false; let lastPanX = 0; let lastPanY = 0; let isDrawingRegion = false;
 let activeSnapLineX = null; let activeSnapLineY = null;
+
+function clearSelection() {
+    window.selectedPointIds = []; window.selectedEdgeIds = []; window.selectedTextIds = []; window.selectedRegionIds = [];
+}
+
+function getSelectionSummary() {
+    return {
+        points: window.selectedPointIds.slice(),
+        edges: window.selectedEdgeIds.slice(),
+        texts: window.selectedTextIds.slice(),
+        regions: window.selectedRegionIds.slice(),
+    };
+}
+
+function getSelectionBounds(selection) {
+    const pointIds = new Set(selection.points || []);
+    const textIds = new Set(selection.texts || []);
+    const regionIds = new Set(selection.regions || []);
+
+    const selectedPoints = window.points.filter(p => pointIds.has(p.id));
+    const selectedTexts = window.texts.filter(t => textIds.has(t.id));
+    const selectedRegions = window.regions.filter(r => regionIds.has(r.id));
+
+    const bounds = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+    selectedPoints.forEach(p => {
+        bounds.minX = Math.min(bounds.minX, p.x);
+        bounds.maxX = Math.max(bounds.maxX, p.x);
+        bounds.minY = Math.min(bounds.minY, p.y);
+        bounds.maxY = Math.max(bounds.maxY, p.y);
+    });
+    selectedTexts.forEach(t => {
+        bounds.minX = Math.min(bounds.minX, t.x);
+        bounds.maxX = Math.max(bounds.maxX, t.x);
+        bounds.minY = Math.min(bounds.minY, t.y);
+        bounds.maxY = Math.max(bounds.maxY, t.y);
+    });
+    selectedRegions.forEach(r => {
+        bounds.minX = Math.min(bounds.minX, r.minX);
+        bounds.maxX = Math.max(bounds.maxX, r.maxX);
+        bounds.minY = Math.min(bounds.minY, r.minY);
+        bounds.maxY = Math.max(bounds.maxY, r.maxY);
+    });
+
+    if (!Number.isFinite(bounds.minX)) return null;
+    return bounds;
+}
+
+window.selectConnectedFigure = function() {
+    let seedPointIds = [...window.selectedPointIds];
+
+    if (seedPointIds.length === 0 && window.selectedEdgeIds.length > 0) {
+        window.selectedEdgeIds.forEach(id => {
+            const edge = window.edges.find(e => e.id === id);
+            if (!edge) return;
+            if (edge.sourceId !== undefined) seedPointIds.push(edge.sourceId);
+            if (edge.targetId !== undefined) seedPointIds.push(edge.targetId);
+        });
+    }
+
+    seedPointIds = [...new Set(seedPointIds)];
+    if (seedPointIds.length === 0) return;
+
+    const pointSet = new Set(seedPointIds);
+    const queue = [...seedPointIds];
+
+    while (queue.length > 0) {
+        const pointId = queue.pop();
+        window.edges.forEach(edge => {
+            const isGraphEdge = ['line', 'curve', 'loop', 'circle', 'arc', 'elliptic-arc'].includes(edge.type);
+            if (!isGraphEdge) return;
+
+            if (edge.sourceId === pointId && edge.targetId !== undefined && !pointSet.has(edge.targetId)) {
+                pointSet.add(edge.targetId);
+                queue.push(edge.targetId);
+            }
+            if (edge.targetId === pointId && edge.sourceId !== undefined && !pointSet.has(edge.sourceId)) {
+                pointSet.add(edge.sourceId);
+                queue.push(edge.sourceId);
+            }
+        });
+    }
+
+    const edgeIds = window.edges
+        .filter(edge => {
+            const isGraphEdge = ['line', 'curve', 'loop', 'circle', 'arc', 'elliptic-arc'].includes(edge.type);
+            if (!isGraphEdge) return false;
+            if (edge.sourceId !== undefined && !pointSet.has(edge.sourceId)) return false;
+            if (edge.targetId !== undefined && !pointSet.has(edge.targetId)) return false;
+            return true;
+        })
+        .map(edge => edge.id);
+
+    const bounds = getSelectionBounds({ points: [...pointSet], texts: [], regions: [] });
+    const textIds = bounds ? window.texts.filter(text => text.x >= bounds.minX - 0.5 && text.x <= bounds.maxX + 0.5 && text.y >= bounds.minY - 0.5 && text.y <= bounds.maxY + 0.5).map(text => text.id) : [];
+    const regionIds = bounds ? window.regions.filter(region => region.minX >= bounds.minX - 0.5 && region.maxX <= bounds.maxX + 0.5 && region.minY >= bounds.minY - 0.5 && region.maxY <= bounds.maxY + 0.5).map(region => region.id) : [];
+
+    window.selectedPointIds = [...pointSet];
+    window.selectedEdgeIds = edgeIds;
+    window.selectedTextIds = textIds;
+    window.selectedRegionIds = regionIds;
+    if (window.updatePropertyPanel) window.updatePropertyPanel();
+    draw();
+};
+
+window.copySelection = function() {
+    const selection = getSelectionSummary();
+    if (selection.points.length === 0 && selection.edges.length === 0 && selection.texts.length === 0 && selection.regions.length === 0) return false;
+
+    const copiedPoints = window.points.filter(point => selection.points.includes(point.id)).map(point => JSON.parse(JSON.stringify(point)));
+    const copiedEdges = window.edges.filter(edge => selection.edges.includes(edge.id)).map(edge => JSON.parse(JSON.stringify(edge)));
+    const copiedTexts = window.texts.filter(text => selection.texts.includes(text.id)).map(text => JSON.parse(JSON.stringify(text)));
+    const copiedRegions = window.regions.filter(region => selection.regions.includes(region.id)).map(region => JSON.parse(JSON.stringify(region)));
+
+    window._selectionClipboard = {
+        points: copiedPoints,
+        edges: copiedEdges,
+        texts: copiedTexts,
+        regions: copiedRegions,
+        bounds: getSelectionBounds(selection),
+        pasteCount: 0,
+        sourceSelection: selection,
+    };
+    return true;
+};
+
+window.pasteSelection = function() {
+    const clipboard = window._selectionClipboard;
+    if (!clipboard) return false;
+
+    const pointIdMap = new Map();
+    const pastedPointIds = [];
+    const pastedTextIds = [];
+    const pastedRegionIds = [];
+    const pastedEdgeIds = [];
+
+    const bounds = clipboard.bounds;
+    const pasteOffset = bounds ? Math.max(1.5, Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY) * 0.15) : 1.5;
+    const offsetX = pasteOffset * (clipboard.pasteCount + 1);
+    const offsetY = -pasteOffset * (clipboard.pasteCount + 1);
+
+    clipboard.points.forEach(point => {
+        const newId = window.pointIdCounter++;
+        const clone = JSON.parse(JSON.stringify(point));
+        clone.id = newId;
+        clone.x += offsetX;
+        clone.y += offsetY;
+        window.points.push(clone);
+        pointIdMap.set(point.id, newId);
+        pastedPointIds.push(newId);
+    });
+
+    clipboard.texts.forEach(text => {
+        const newId = window.textIdCounter++;
+        const clone = JSON.parse(JSON.stringify(text));
+        clone.id = newId;
+        clone.x += offsetX;
+        clone.y += offsetY;
+        window.texts.push(clone);
+        pastedTextIds.push(newId);
+    });
+
+    clipboard.regions.forEach(region => {
+        const newId = window.regionIdCounter++;
+        const clone = JSON.parse(JSON.stringify(region));
+        clone.id = newId;
+        clone.minX += offsetX;
+        clone.maxX += offsetX;
+        clone.minY += offsetY;
+        clone.maxY += offsetY;
+        window.regions.push(clone);
+        pastedRegionIds.push(newId);
+    });
+
+    clipboard.edges.forEach(edge => {
+        const newSourceId = edge.sourceId !== undefined ? pointIdMap.get(edge.sourceId) : undefined;
+        const newTargetId = edge.targetId !== undefined ? pointIdMap.get(edge.targetId) : undefined;
+        const sourceReady = edge.sourceId === undefined || newSourceId !== undefined;
+        const targetReady = edge.targetId === undefined || newTargetId !== undefined;
+        if (!sourceReady || !targetReady) return;
+
+        const newId = window.edgeIdCounter++;
+        const clone = JSON.parse(JSON.stringify(edge));
+        clone.id = newId;
+        if (newSourceId !== undefined) clone.sourceId = newSourceId;
+        if (newTargetId !== undefined) clone.targetId = newTargetId;
+        window.edges.push(clone);
+        pastedEdgeIds.push(newId);
+    });
+
+    clipboard.pasteCount += 1;
+    window.selectedPointIds = pastedPointIds;
+    window.selectedEdgeIds = pastedEdgeIds;
+    window.selectedTextIds = pastedTextIds;
+    window.selectedRegionIds = pastedRegionIds;
+    saveState();
+    if (window.updatePropertyPanel) window.updatePropertyPanel();
+    draw();
+    return true;
+};
 
 function getUnitSize() { return baseUnitSize * window.zoom; }
 window.zoomIn = function() { window.zoom *= 1.2; draw(); }
@@ -723,6 +923,19 @@ window.addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') { 
         e.preventDefault(); window.selectedPointIds = window.points.map(p => p.id); window.selectedEdgeIds = window.edges.map(ed => ed.id);
         window.selectedTextIds = window.texts.map(t => t.id); window.selectedRegionIds = window.regions.map(r => r.id); window.setMode('select', true); return; 
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
+        if (window.copySelection && window.copySelection()) e.preventDefault();
+        return;
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') {
+        if (window.pasteSelection && window.pasteSelection()) e.preventDefault();
+        return;
+    }
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'g') {
+        e.preventDefault();
+        if (window.selectConnectedFigure) window.selectConnectedFigure();
+        return;
     }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); window.undo(); return; }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') { e.preventDefault(); window.redo(); return; }

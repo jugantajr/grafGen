@@ -61,6 +61,9 @@
                 <button id="mode-lasso" class="icon-btn" onclick="setMode('lasso')" title="Lasso: Draw around items to select them" ><span class="material-symbols-outlined">polyline</span></button>
                 <button id="mode-paint" class="icon-btn" onclick="setMode('paint')" title="Paint Bucket: Click items to apply current color"><span class="material-symbols-outlined" style="color: #9101ff">format_color_fill</span></button>
                 <button id="mode-move" class="icon-btn" onclick="setMode('move', true)" title="Move: Drag items or pan canvas"><span class="material-symbols-outlined">pan_tool</span></button>
+                <button class="icon-btn" onclick="selectConnectedFigure()" title="Select the connected figure from the current selection (Ctrl+Shift+G)"><span class="material-symbols-outlined">schema</span></button>
+                <button class="icon-btn" onclick="copySelection()" title="Copy selected figure (Ctrl/Cmd+C)"><span class="material-symbols-outlined">content_copy</span></button>
+                <button class="icon-btn" onclick="pasteSelection()" title="Paste copied figure (Ctrl/Cmd+V)"><span class="material-symbols-outlined">content_paste</span></button>
                 <button id="mode-delete" class="icon-btn" onclick="setMode('delete')" title="Eraser: Click item to delete" style="color: #ff0101"><span class="material-symbols-outlined">ink_eraser</span></button>
             </div>
         </div>
@@ -232,6 +235,8 @@
                     <ul style="line-height: 1.8; list-style: none; padding-left: 0; margin-top: 0; font-size: 14px;">
                         <li><span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 5px; font-size: 18px;">arrow_selector_tool</span> <kbd class="hk">S</kbd> <b>Select:</b> Click to edit items. <b>Hold Shift</b> for multi-select.</li>
                         <li><span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 5px; font-size: 18px;">polyline</span> <b>Lasso:</b> Draw a freehand circle to grab multiple nodes.</li>
+                        <li><span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 5px; font-size: 18px;">schema</span> <b>Figure select:</b> Pick one node, then use the figure button or <kbd class="hk">Ctrl</kbd>+<kbd class="hk">Shift</kbd>+<kbd class="hk">G</kbd> to expand to the whole connected graph before copying.</li>
+                        <li><span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 5px; font-size: 18px;">content_copy</span> <b>Copy / Paste:</b> Use <kbd class="hk">Ctrl</kbd>+<kbd class="hk">C</kbd> and <kbd class="hk">Ctrl</kbd>+<kbd class="hk">V</kbd> to duplicate the selected figure with a slight offset.</li>
                         <li><span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 5px; color: #9101ff; font-size: 18px;">format_color_fill</span> <kbd class="hk">F</kbd> <b>Paint Bucket:</b> Click any item to dye it the active color.</li>
                         <li><span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 5px; font-size: 18px;">pan_tool</span> <kbd class="hk">M</kbd> <b>Move:</b> Drag selected items, or drag empty space to pan.</li>
                         <li><span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 5px; color: #dc3545; font-size: 18px;">ink_eraser</span> <kbd class="hk">Del</kbd> <b>Eraser:</b> Click items to delete. (Or press 'Delete' key).</li>
