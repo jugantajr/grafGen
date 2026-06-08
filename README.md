@@ -57,7 +57,10 @@ Stop drawing standard graphs by hand. Instantly generate common structures:
 * **Bipartite ($K_{m,n}$)**
 * **Wheel ($W_n$)**
 * **Lattice Grid ($m \times n$)**
+* **Ladder ($L_n$), Prism, and House graphs**
 * **3D Hypercube ($Q_3$)**
+
+The Macros panel is hidden by default and can be revealed from the toolbar when needed.
 
 ---
 
@@ -76,7 +79,7 @@ Access the generated code from the right-hand panel.
 
 grafGen also supports simple XY plot tables for chart previewing and Matplotlib export.
 
-The plot panel lets you choose a chart type, import CSV text, toggle grid and legend display, and export the same data to Matplotlib, PGFPlots, or Gnuplot.
+The plot panel is hidden by default and can be opened from the toolbar. Once visible, it lets you choose a chart type, import CSV text, toggle grid and legend display, and export the same data to Matplotlib, PGFPlots, or Gnuplot.
 
 Choose one of these modes in the plot panel:
 

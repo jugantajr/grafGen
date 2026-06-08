@@ -28,6 +28,8 @@
                 <button id="redo-btn" onclick="redo()" title="Redo (Ctrl+Y)" class="icon-btn" data-toolbar-id="redo-btn"><span class="material-symbols-outlined">redo</span><span class="drag-handle material-symbols-outlined" aria-hidden="true">drag_indicator</span></button>
                 <button id="layout-btn" onclick="toggleLayout()" title="Switch layout for mobile" class="icon-btn btn-muted" data-toolbar-id="layout-btn"><span class="material-symbols-outlined">swap_vert</span><span class="drag-handle material-symbols-outlined" aria-hidden="true">drag_indicator</span></button>
                 <button id="clear-btn" onclick="clearAll()" title="Clear entire canvas" class="danger icon-btn btn-danger" data-toolbar-id="clear-btn"><span class="material-symbols-outlined">delete_sweep</span><span class="drag-handle material-symbols-outlined" aria-hidden="true">drag_indicator</span></button>
+                <button id="macro-toggle" onclick="toggleMacroPanel()" title="Show Macros" class="icon-btn btn-purple" data-toolbar-id="macro-toggle"><span class="material-symbols-outlined">extension</span></button>
+                <button id="plot-table-toggle" onclick="togglePlotTable()" title="Show XY Plot Table" class="icon-btn btn-teal" data-toolbar-id="plot-table-toggle"><span class="material-symbols-outlined">table_view</span></button>
 
                 <button id="untangle-btn" onclick="untangleGraph()" title="Untangle (Physics Auto-Layout)" class="icon-btn btn-purple" data-toolbar-id="untangle-btn"><span class="material-symbols-outlined">auto_fix_high</span><span class="drag-handle material-symbols-outlined" aria-hidden="true">drag_indicator</span></button>
 
@@ -114,7 +116,7 @@
                 </div>
             </div>
 
-            <div class="tool-group" style="background: #eef2f5; border-radius: 4px; padding: 4px 10px; border: 1px solid #ccd6e0;">
+            <div id="macro-panel" class="tool-group" style="background: #eef2f5; border-radius: 4px; padding: 4px 10px; border: 1px solid #ccd6e0; display: none;">
                 <strong style="color: #0056b3;">Macros:</strong>
                 <select id="macro-type" onchange="toggleMacroInputs()" title="Select shape">
                     <option value="Kn">Complete (Kn)</option>
@@ -124,6 +126,9 @@
                     <option value="Km,n">Bipartite (Km,n)</option>
                     <option value="Wn">Wheel (Wn)</option>
                     <option value="Grid">Grid (m x n)</option>
+                    <option value="Ladder">Ladder (Ln)</option>
+                    <option value="Prism">Prism (n-gonal)</option>
+                    <option value="House">House</option>
                     <option value="Q3">Hypercube (Q3)</option>
                 </select>
                 <input type="number" id="macro-n" value="3" min="1" max="50" style="width: 45px;" title="Nodes (n)">
@@ -175,7 +180,7 @@
                     
                 </div>
             </div>
-            <div class="tool-group" style="margin-top: 8px; align-items: flex-start; flex-direction: column; gap: 6px; width: 100%;">
+            <div id="plot-table-panel" class="tool-group" style="margin-top: 8px; align-items: flex-start; flex-direction: column; gap: 6px; width: 100%; display: none;">
                 <strong style="color: #0056b3;">XY Plot Table:</strong>
                 <div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center; width: 100%;">
                     <select id="plot-type" title="Choose plot type">
@@ -284,6 +289,7 @@
                         <li><b>Kn / Cn / Pn / Star:</b> Instantly spawn Complete graphs, Cycles, Paths, and Stars.</li>
                         <li><b>Km,n (Bipartite):</b> Generates complete bipartite layouts.</li>
                         <li><b>Grid:</b> Generates a perfect $m \times n$ rectangular lattice.</li>
+                        <li><b>Ladder / Prism / House:</b> Generates ladder graphs, prism graphs, and a compact house-shaped graph.</li>
                         <li><b>Q3 (Hypercube):</b> Spawns a 3D projected hypercube.</li>
                         <li><span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 5px; color: #6f42c1; font-size: 18px;">auto_fix_high</span> <b>Magic Untangle:</b> Uses spring-physics to physically repel nodes and untangle messy crossing edges.</li>
                         <li><span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 5px; color: #e83e8c; font-size: 18px;">palette</span> <b>Auto-Color:</b> Uses a greedy algorithm to instantly color the graph without adjacent nodes sharing a color.</li>
@@ -310,7 +316,7 @@
             
             <div style="background: #eef2f5; padding: 10px; border-radius: 6px; margin-top: 20px; font-size: 13px; color: #444;">
                 <b style="color: #0056b3;">Pro Tips:</b> 
-                Use <b>Ctrl+A</b> to select all items. <b>Ctrl+Z / Ctrl+Y</b> to Undo/Redo. Use the <span class="material-symbols-outlined" style="font-size: 14px; vertical-align: middle; color: #28a745;">content_copy</span> <b>Copy Button</b> to instantly grab your generated code!
+                Use <b>Ctrl+A</b> to select all items. <b>Ctrl+Z / Ctrl+Y</b> to Undo/Redo. Use the <span class="material-symbols-outlined" style="font-size: 14px; vertical-align: middle; color: #28a745;">content_copy</span> <b>Copy Button</b> to instantly grab your generated code. The <span class="material-symbols-outlined" style="font-size: 14px; vertical-align: middle; color: #6f42c1;">extension</span> and <span class="material-symbols-outlined" style="font-size: 14px; vertical-align: middle; color: #20c997;">table_view</span> toolbar buttons reveal the hidden Macros and XY Plot Table panels.
             </div>
         </div>
     </div>

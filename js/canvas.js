@@ -508,6 +508,60 @@ window.insertMacro = function() {
             }
             gridNodes.push(row);
         }
+    } else if (type === 'Ladder') {
+        let length = Math.max(2, n);
+        let topRow = []; let bottomRow = [];
+        let startX = cx - ((length - 1) * 2) / 2;
+        let topY = cy + 1;
+        let bottomY = cy - 1;
+        for (let i = 0; i < length; i++) {
+            let topId = window.pointIdCounter++;
+            let bottomId = window.pointIdCounter++;
+            window.points.push({ id: topId, x: startX + i * 2, y: topY, color: window.activeColor, style: 'solid', label: String(startLbl + i), labelAngle: 90 });
+            window.points.push({ id: bottomId, x: startX + i * 2, y: bottomY, color: window.activeColor, style: 'solid', label: String(startLbl + length + i), labelAngle: 90 });
+            topRow.push(topId);
+            bottomRow.push(bottomId);
+            window.edges.push({ id: window.edgeIdCounter++, type: 'line', sourceId: topId, targetId: bottomId, color: window.activeColor, style: 'solid', arrow: 'none', label: '', labelPos: 'above' });
+            if (i > 0) {
+                window.edges.push({ id: window.edgeIdCounter++, type: 'line', sourceId: topRow[i - 1], targetId: topId, color: window.activeColor, style: 'solid', arrow: 'none', label: '', labelPos: 'above' });
+                window.edges.push({ id: window.edgeIdCounter++, type: 'line', sourceId: bottomRow[i - 1], targetId: bottomId, color: window.activeColor, style: 'solid', arrow: 'none', label: '', labelPos: 'above' });
+            }
+        }
+    } else if (type === 'Prism') {
+        let sides = Math.max(3, n);
+        let topCycle = []; let bottomCycle = []; let radius = Math.max(3, sides * 0.5);
+        for (let i = 0; i < sides; i++) {
+            let angle = -Math.PI / 2 + (i * 2 * Math.PI) / sides;
+            let deg = Math.round((-angle * 180 / Math.PI + 360) % 360);
+            let topId = window.pointIdCounter++;
+            let bottomId = window.pointIdCounter++;
+            window.points.push({ id: topId, x: cx + radius * Math.cos(angle), y: cy - 1.5 - radius * Math.sin(angle), color: window.activeColor, style: 'solid', label: String(startLbl + i), labelAngle: deg });
+            window.points.push({ id: bottomId, x: cx + radius * Math.cos(angle), y: cy + 1.5 - radius * Math.sin(angle), color: window.activeColor, style: 'solid', label: String(startLbl + sides + i), labelAngle: deg });
+            topCycle.push(topId);
+            bottomCycle.push(bottomId);
+        }
+        for (let i = 0; i < sides; i++) {
+            window.edges.push({ id: window.edgeIdCounter++, type: 'line', sourceId: topCycle[i], targetId: topCycle[(i + 1) % sides], color: window.activeColor, style: 'solid', arrow: 'none', label: '', labelPos: 'above' });
+            window.edges.push({ id: window.edgeIdCounter++, type: 'line', sourceId: bottomCycle[i], targetId: bottomCycle[(i + 1) % sides], color: window.activeColor, style: 'solid', arrow: 'none', label: '', labelPos: 'above' });
+            window.edges.push({ id: window.edgeIdCounter++, type: 'line', sourceId: topCycle[i], targetId: bottomCycle[i], color: window.activeColor, style: 'solid', arrow: 'none', label: '', labelPos: 'above' });
+        }
+    } else if (type === 'House') {
+        let base = [
+            { x: cx - 2, y: cy - 1.5 },
+            { x: cx + 2, y: cy - 1.5 },
+            { x: cx + 2, y: cy - 4 },
+            { x: cx - 2, y: cy - 4 },
+            { x: cx, y: cy - 6 }
+        ];
+        let ids = [];
+        base.forEach((p, i) => {
+            let id = window.pointIdCounter++;
+            window.points.push({ id, x: p.x, y: p.y, color: window.activeColor, style: 'solid', label: String(startLbl + i), labelAngle: 90 });
+            ids.push(id);
+        });
+        [[0,1],[1,2],[2,3],[3,0],[3,4],[2,4]].forEach(([a,b]) => {
+            window.edges.push({ id: window.edgeIdCounter++, type: 'line', sourceId: ids[a], targetId: ids[b], color: window.activeColor, style: 'solid', arrow: 'none', label: '', labelPos: 'above' });
+        });
     } else if (type === 'Q3') {
         let offset = 1.5; let s = 3; 
         let pts = [ {x: cx - s/2, y: cy - s/2}, {x: cx + s/2, y: cy - s/2}, {x: cx + s/2, y: cy + s/2}, {x: cx - s/2, y: cy + s/2}, {x: cx - s/2 + offset, y: cy - s/2 + offset}, {x: cx + s/2 + offset, y: cy - s/2 + offset}, {x: cx + s/2 + offset, y: cy + s/2 + offset}, {x: cx - s/2 + offset, y: cy + s/2 + offset} ];

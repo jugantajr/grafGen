@@ -207,6 +207,46 @@ window.copyCode = function() {
 // ==========================================
 // COLLAPSIBLE TOOLBAR + CUSTOMIZER
 // ==========================================
+function setPlotTableVisibility(visible) {
+    const panel = document.getElementById('plot-table-panel');
+    if (!panel) return;
+    panel.style.display = visible ? '' : 'none';
+    localStorage.setItem('prograph_plot_table_visible', visible ? '1' : '0');
+
+    const button = document.getElementById('plot-table-toggle');
+    if (button) {
+        const icon = button.querySelector('.material-symbols-outlined');
+        if (icon) icon.innerText = visible ? 'visibility_off' : 'table_view';
+        button.title = visible ? 'Hide XY Plot Table' : 'Show XY Plot Table';
+    }
+}
+
+function setMacroPanelVisibility(visible) {
+    const panel = document.getElementById('macro-panel');
+    if (!panel) return;
+    panel.style.display = visible ? '' : 'none';
+    localStorage.setItem('prograph_macro_panel_visible', visible ? '1' : '0');
+
+    const button = document.getElementById('macro-toggle');
+    if (button) {
+        const icon = button.querySelector('.material-symbols-outlined');
+        if (icon) icon.innerText = visible ? 'visibility_off' : 'extension';
+        button.title = visible ? 'Hide Macros' : 'Show Macros';
+    }
+}
+
+window.toggleMacroPanel = function() {
+    const panel = document.getElementById('macro-panel');
+    const visible = !panel || panel.style.display === 'none';
+    setMacroPanelVisibility(visible);
+};
+
+window.togglePlotTable = function() {
+    const panel = document.getElementById('plot-table-panel');
+    const visible = !panel || panel.style.display === 'none';
+    setPlotTableVisibility(visible);
+};
+
 window.toggleToolbar = function() {
     const tb = document.getElementById('toolbar');
     tb.classList.toggle('collapsed');
@@ -286,6 +326,8 @@ function loadToolbarState() {
             if (el) el.style.display = cfg[id] ? '' : 'none';
         });
     }
+    setPlotTableVisibility(localStorage.getItem('prograph_plot_table_visible') === '1');
+    setMacroPanelVisibility(localStorage.getItem('prograph_macro_panel_visible') === '1');
 }
 
 // Drag-and-drop reordering for toolbar
