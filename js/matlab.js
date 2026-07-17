@@ -15,9 +15,10 @@ window.generateMATLAB = function() {
             let u = `"${e.sourceId}"`;
             let v = `"${e.targetId}"`;
             
-            // MATLAB weights must be numbers. If the label isn't a number, default to 1
-            let w = (e.label && !isNaN(e.label)) ? Number(e.label) : 1;
-            if (e.label && !isNaN(e.label)) hasWeights = true;
+            // MATLAB weights must be finite numbers. If label is not finite, default to 1.
+            const numericLabel = Number(e.label);
+            let w = Number.isFinite(numericLabel) ? numericLabel : 1;
+            if (Number.isFinite(numericLabel)) hasWeights = true;
 
             if (e.arrow === 'start') {
                 s.push(v); t.push(u); weights.push(w);

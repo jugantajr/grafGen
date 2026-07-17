@@ -1,5 +1,11 @@
 // js/sage.js
 
+function escapeSageString(value) {
+    return String(value)
+        .replace(/\\/g, '\\\\')
+        .replace(/"/g, '\\"');
+}
+
 window.generateSageMath = function() {
     if (window.points.length === 0) return "# Add points to generate SageMath code!";
 
@@ -16,7 +22,7 @@ window.generateSageMath = function() {
             let v = e.targetId;
             
             // If the user added a custom text label to the edge, include it in the tuple
-            let lbl = (e.label && e.label !== "") ? `"${e.label}"` : null;
+            let lbl = (e.label && e.label !== "") ? `"${escapeSageString(e.label)}"` : null;
 
             if (e.arrow === 'start') {
                 edgeList.push(lbl ? `(${v}, ${u}, ${lbl})` : `(${v}, ${u})`);

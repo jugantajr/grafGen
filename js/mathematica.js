@@ -1,5 +1,11 @@
 // js/mathematica.js
 
+function escapeMathematicaString(value) {
+    return String(value)
+        .replace(/\\/g, '\\\\')
+        .replace(/"/g, '\\"');
+}
+
 window.generateMathematica = function() {
     if (window.points.length === 0) return "(* Add points to generate Mathematica code! *)";
 
@@ -25,7 +31,7 @@ window.generateMathematica = function() {
             
             // If the user added a label/weight, attach it as a Property
             if (lbl) {
-                edgeList.push(`Property[${edgeStr}, EdgeLabels -> "${lbl}"]`);
+                edgeList.push(`Property[${edgeStr}, EdgeLabels -> "${escapeMathematicaString(lbl)}"]`);
             } else {
                 edgeList.push(edgeStr);
             }

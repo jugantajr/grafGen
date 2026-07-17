@@ -6,12 +6,13 @@
     <title>grafGen</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960'><style>path{fill:%230056b3;}@media (prefers-color-scheme: dark){path{fill:%238ab4f8;}}</style><path d='M120-280v-80h720v80H120Zm120-160-80-80 200-200 160 160 240-320 80 80-320 400-160-160-120 120Z'/></svg>">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
-    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/numeric/1.2.6/numeric.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/numeric/1.2.6/numeric.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20,400,0,0" />
     <link rel="stylesheet" href="css/style.css">
 </head>
+
 <body>
     <div id="toolbar">
         <div class="toolbar-row">
@@ -23,7 +24,6 @@
                 </div>
             <div class="tool-group">
                 <div id="toolbar-actions" class="toolbar-actions">
-                <button onclick="toggleTheme()" title="Toggle Dark/Light Mode" class="icon-btn" id="theme-btn" data-toolbar-id="theme-btn"><span class="material-symbols-outlined">dark_mode</span><span class="drag-handle material-symbols-outlined" aria-hidden="true">drag_indicator</span></button>
                 <button id="undo-btn" onclick="undo()" title="Undo (Ctrl+Z)" class="icon-btn" data-toolbar-id="undo-btn"><span class="material-symbols-outlined">undo</span><span class="drag-handle material-symbols-outlined" aria-hidden="true">drag_indicator</span></button>
                 <button id="redo-btn" onclick="redo()" title="Redo (Ctrl+Y)" class="icon-btn" data-toolbar-id="redo-btn"><span class="material-symbols-outlined">redo</span><span class="drag-handle material-symbols-outlined" aria-hidden="true">drag_indicator</span></button>
                 <button id="layout-btn" onclick="toggleLayout()" title="Switch layout for mobile" class="icon-btn btn-muted" data-toolbar-id="layout-btn"><span class="material-symbols-outlined">swap_vert</span><span class="drag-handle material-symbols-outlined" aria-hidden="true">drag_indicator</span></button>
@@ -41,6 +41,10 @@
 
                 <button id="toolbar-toggle" class="icon-btn" title="Collapse toolbar" onclick="toggleToolbar()"><span class="material-symbols-outlined">menu</span></button>
                 <button id="toolbar-customize-btn" class="icon-btn" title="Customize toolbar" onclick="openToolbarCustomizer()"><span class="material-symbols-outlined">settings</span></button>
+                <button id="account-toggle-btn" class="icon-btn btn-info" onclick="toggleAccountPanel()" title="Account Switch" style="margin-right: 5px;" data-toolbar-id="account-toggle-btn">
+                    <span class="material-symbols-outlined">account_circle</span>
+                    <span class="drag-handle material-symbols-outlined" aria-hidden="true">drag_indicator</span>
+                </button>
                 </div>
             </div>
             <div class="tool-group">
@@ -49,6 +53,15 @@
                 <label title="Show/hide grid"><input type="checkbox" id="toggle-grid" checked onchange="draw()"> Grid</label>
                 <label title="Show/hide coordinate axes"><input type="checkbox" id="toggle-axes" checked onchange="draw()"> Axes</label>
                 <label title="Snap to grid intersections"><input type="checkbox" id="snap-grid" checked> Snap</label>
+                <button onclick="toggleTheme()" title="Toggle Dark/Light Mode" class="icon-btn" id="theme-btn" data-toolbar-id="theme-btn"><span class="material-symbols-outlined">dark_mode</span><span class="drag-handle material-symbols-outlined" aria-hidden="true">drag_indicator</span></button>
+                <div id="layout-switch-wrapper" data-toolbar-id="layout-switch-wrapper" title="Workspace Layout" style="display: inline-flex; align-items: center; margin-right: 15px;">
+                    <select id="layout-switch" onchange="switchWorkspaceLayout(this.value)" style="padding: 4px; border-radius: 4px; border: 1px solid #ccc; cursor: pointer;">
+                        <option value="both">Layout: Both</option>
+                        <option value="canvas">Only Coordinate</option>
+                        <option value="code">Only Code</option>
+                    </select>
+                    <span class="drag-handle material-symbols-outlined" aria-hidden="true">drag_indicator</span>
+                </div>
             </div>
             <div class="tool-group">
                 <strong>Tools:</strong>
@@ -99,8 +112,11 @@
                 <span id="properties-placeholder">Select an item to edit</span>
                 <div id="properties-wrapper">
                     <div class="prop-wrapper" id="wrap-label">Text: <input type="text" id="prop-label" placeholder="..." style="width: 80px;"></div>
+                    <div class="prop-wrapper" id="wrap-text-multiline" style="display:none; align-items:flex-start;" title="Use multiple lines for theorem-style annotations. Each line is rendered as math text.">Annotation: <textarea id="prop-text-multiline" placeholder="Line 1&#10;Line 2" style="width: 170px; min-height: 56px; resize: vertical;"></textarea></div>
+                    <div class="prop-wrapper" id="wrap-text-box" style="display:none;" title="Wrap the annotation in a bordered box on canvas and export output.">Box: <input type="checkbox" id="prop-text-box" title="Draw annotation in a boxed style"></div>
                     <div class="prop-wrapper" id="wrap-angle">Angle: <input type="number" id="prop-label-angle" style="width: 50px;"></div>
                     <div class="prop-wrapper" id="wrap-pos">Pos: <select id="prop-label-pos"><option value="above">Above</option><option value="below">Below</option><option value="left">Left</option><option value="right">Right</option><option value="on">On Line</option></select></div>
+                    <div class="prop-wrapper" id="wrap-label-t" title="Move edge label anchor along the edge: 0=start, 0.5=center, 1=end">Anchor t: <input type="number" id="prop-label-t" min="0" max="1" step="0.05" style="width: 58px;" title="0=start, 0.5=center, 1=end"></div>
 
                     <div class="prop-wrapper" id="wrap-radius"><span id="lbl-radius">Radius:</span> <input type="number" step="0.5" id="prop-radius" style="width: 50px;" onchange="applyPointProperties()"></div>
 
@@ -136,6 +152,23 @@
                 <button onclick="insertMacro()" style="background: #28a745; color: white; border-color: #218838; font-weight: bold;" title="Insert Graph">Insert</button>
             </div>
         </div>
+    </div>
+
+    <div class="account-panel" id="floating-account-panel" style="display: none; position: absolute; right: 20px; top: 60px; z-index: 1000; background: #fff; border: 1px solid #ccc; padding: 15px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); min-width: 300px;">
+        <div class="account-panel-header">
+            <strong>Accounts</strong>
+            <span id="account-status">Stored locally in this browser.</span>
+        </div>
+        <div class="account-controls">
+            <input id="account-name-input" type="text" placeholder="New account name" style="min-width: 180px;">
+            <button onclick="createOrSwitchAccount()" class="btn-info">Create / Switch</button>
+            <select id="account-select" onchange="switchAccount()" title="Switch account"></select>
+        </div>
+        <div class="account-controls">
+            <input id="graph-name-input" type="text" placeholder="Graph name" style="min-width: 180px;">
+            <button onclick="saveGraphToAccount()" class="btn-strong">Save Graph</button>
+        </div>
+        <div id="saved-graphs-list" class="saved-graphs-list"></div>
     </div>
     
     <div id="workspace">
@@ -178,6 +211,17 @@
                         <option value="matlab">MATLAB</option>
                     </select>
                     
+                </div>
+            </div>
+            <div class="import-panel">
+                <div class="import-panel-header">
+                    <strong>Paste TikZ / PSTricks</strong>
+                    <span id="import-status">Paste code here and the figure will render automatically.</span>
+                </div>
+                <textarea id="code-import-input" spellcheck="false" placeholder="Paste TikZ or PSTricks code here..."></textarea>
+                <div class="import-panel-actions">
+                    <button onclick="importCodeFromText(document.getElementById('code-import-input').value)" class="btn-info">Render Paste</button>
+                    <button onclick="clearImportedCode()" class="btn-muted">Clear</button>
                 </div>
             </div>
             <div id="plot-table-panel" class="tool-group" style="margin-top: 8px; align-items: flex-start; flex-direction: column; gap: 6px; width: 100%; display: none;">
@@ -305,6 +349,18 @@
                         <li><b>Invisible Nodes (Wireframes):</b> Select a node and set its <b>Radius to 0</b>. It becomes invisible on the canvas and exports as a hidden coordinate in LaTeX, allowing you to draw pure architectural wireframes!</li>
                     </ul>
 
+                    <h3 style="color: #0056b3; margin-bottom: 10px; border-bottom: 2px solid #eef2f5; padding-bottom: 5px; margin-top: 25px;">📝 Annotation Labels</h3>
+                    <ul style="line-height: 1.8; list-style: none; padding-left: 0; margin-top: 0; font-size: 14px;">
+                        <li><b>Edge Label Anchor (t):</b> For line/curve edges, set <b>Anchor t</b> in Properties to place labels from start to end (<b>0.00</b> to <b>1.00</b>).</li>
+                        <li><b>Multiline Text:</b> Select a text annotation and use the <b>Annotation</b> textarea to enter multiple lines.</li>
+                        <li><b>Boxed Annotations:</b> Toggle <b>Box</b> to render theorem-style callout boxes on canvas and in TikZ/PSTricks exports.</li>
+                        <li><b>Example:</b>
+                            <pre style="white-space: pre-wrap; background: #f8f9fb; border: 1px solid #e1e5ea; padding: 8px; border-radius: 6px; margin: 6px 0 0;">\lambda_1 = 4
+\lambda_2 = 1
+\sum_i d_i = 2|E|</pre>
+                        </li>
+                    </ul>
+
                     <h3 style="color: #0056b3; margin-bottom: 10px; border-bottom: 2px solid #eef2f5; padding-bottom: 5px; margin-top: 25px;">💾 Output & Export</h3>
                     <ul style="line-height: 1.8; list-style: none; padding-left: 0; margin-top: 0; font-size: 14px;">
                         <li><b>TikZ / PSTricks:</b> Standard LaTeX graphics packages.</li>
@@ -370,6 +426,8 @@
     <script src="js/sage.js"></script>
     <script src="js/mathematica.js"></script>
     <script src="js/matlab.js"></script>
+    <script src="js/persistence.js"></script>
+    <script src="js/codeImporter.js"></script>
     <script src="js/canvas.js"></script>
 </body>
 </html>

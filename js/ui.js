@@ -98,7 +98,6 @@ function setupColorPicker() {
         if (!document.getElementById('color-picker').contains(e.target)) document.getElementById('color-list').classList.add('select-hide');
     });
 }
-window.addEventListener('DOMContentLoaded', setupColorPicker);
 window.getHexFromName = function(name) {
     let match = basicColors.find(c => c.name === name); return match ? match.hex : "#000000";
 };
@@ -180,11 +179,6 @@ if (window.matchMedia) {
     });
 }
 
-// initialize theme on load
-window.addEventListener('DOMContentLoaded', () => {
-    const saved = localStorage.getItem('prograph_theme') || 'light';
-    setThemeMode(saved, false);
-});
 window.copyCode = function() {
     const codeBox = document.getElementById('codeOutput');
     if (!codeBox.value || codeBox.value.startsWith("% Add points")) return;
@@ -400,13 +394,213 @@ function loadToolbarOrder() {
     });
 }
 
-// Wire drag init after DOM ready
-window.addEventListener('DOMContentLoaded', () => {
+function ensureAriaLabels() {
+    document.querySelectorAll('button, input, select, textarea').forEach((el) => {
+        if (el.getAttribute('aria-label')) return;
+        const title = el.getAttribute('title');
+        if (title) el.setAttribute('aria-label', title);
+    });
+}
+
+function bootstrapUI() {
+    setupColorPicker();
+    const saved = localStorage.getItem('prograph_theme') || 'light';
+    setThemeMode(saved, false);
     loadToolbarOrder();
     initToolbarDrag();
-});
-
-window.addEventListener('DOMContentLoaded', () => {
-    // build color picker etc. already wired — load toolbar state after DOM ready
     loadToolbarState();
-});
+    ensureAriaLabels();
+}
+
+window.addEventListener('DOMContentLoaded', bootstrapUI);
+
+function normalizeAccountLabel(value) {
+    return String(value || '').trim();
+}
+
+function getAccountPanelElements() {
+    return {
+        accountNameInput: document.getElementById('account-name-input'),
+        accountSelect: document.getElementById('account-select'),
+        accountStatus: document.getElementById('account-status'),
+        graphNameInput: document.getElementById('graph-name-input'),
+        savedGraphsList: document.getElementById('saved-graphs-list'),
+    };
+}
+
+function refreshAccountPanel() {
+    const elements = getAccountPanelElements();
+    if (!elements.accountSelect || !elements.savedGraphsList) return;
+
+    const accounts = typeof window.prographListAccounts === 'function' ? window.prographListAccounts() : ['Guest'];
+    const activeAccount = typeof window.prographGetActiveAccount === 'function' ? window.prographGetActiveAccount() : 'Guest';
+
+    elements.accountSelect.innerHTML = '';
+    accounts.forEach(accountName => {
+        const option = document.createElement('option');
+        option.value = accountName;
+        option.textContent = accountName;
+        if (accountName === activeAccount) option.selected = true;
+        elements.accountSelect.appendChild(option);
+    });
+
+    if (elements.accountStatus) {
+        const graphCount = typeof window.prographGetActiveGraphs === 'function' ? window.prographGetActiveGraphs().length : 0;
+        elements.accountStatus.textContent = `Stored locally in this browser. ${graphCount} saved graph${graphCount === 1 ? '' : 's'}.`;
+    }
+
+    const graphs = typeof window.prographGetActiveGraphs === 'function' ? window.prographGetActiveGraphs() : [];
+    elements.savedGraphsList.innerHTML = '';
+
+    if (!graphs.length) {
+        const empty = document.createElement('div');
+        empty.className = 'saved-graphs-empty';
+        empty.textContent = 'No saved graphs in this account yet.';
+        elements.savedGraphsList.appendChild(empty);
+        return;
+    }
+
+    graphs.forEach(graph => {
+        const row = document.createElement('div');
+        row.className = 'saved-graph-item';
+
+        const meta = document.createElement('div');
+        meta.className = 'saved-graph-meta';
+        const title = document.createElement('strong');
+        title.textContent = graph.name || 'Untitled Graph';
+        const details = document.createElement('span');
+        details.textContent = `Saved ${new Date(graph.savedAt).toLocaleString()}`;
+        meta.appendChild(title);
+        meta.appendChild(details);
+
+        const actions = document.createElement('div');
+        actions.className = 'saved-graph-actions';
+
+        const loadBtn = document.createElement('button');
+        loadBtn.className = 'btn-info';
+        loadBtn.textContent = 'Load';
+        loadBtn.addEventListener('click', () => {
+            if (typeof window.prographLoadGraphFromAccount === 'function') {
+                window.prographLoadGraphFromAccount(graph.id);
+                refreshAccountPanel();
+            }
+        });
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'btn-danger';
+        deleteBtn.textContent = 'Delete';
+        deleteBtn.addEventListener('click', () => {
+            if (window.confirm(`Delete “${graph.name || 'Untitled Graph'}”?`)) {
+                if (typeof window.prographDeleteGraphFromAccount === 'function') {
+                    window.prographDeleteGraphFromAccount(graph.id);
+                    refreshAccountPanel();
+                }
+            }
+        });
+
+        actions.appendChild(loadBtn);
+        actions.appendChild(deleteBtn);
+
+        row.appendChild(meta);
+        row.appendChild(actions);
+        elements.savedGraphsList.appendChild(row);
+    });
+}
+
+window.refreshAccountPanel = refreshAccountPanel;
+
+window.createOrSwitchAccount = function() {
+    const { accountNameInput } = getAccountPanelElements();
+    const name = normalizeAccountLabel(accountNameInput && accountNameInput.value);
+    if (!name) {
+        alert('Enter an account name first.');
+        return;
+    }
+
+    if (typeof window.prographSetActiveAccount === 'function') {
+        window.prographSetActiveAccount(name);
+        if (accountNameInput) accountNameInput.value = '';
+        refreshAccountPanel();
+    }
+};
+
+window.switchAccount = function() {
+    const { accountSelect } = getAccountPanelElements();
+    const name = normalizeAccountLabel(accountSelect && accountSelect.value);
+    if (!name) return;
+
+    if (typeof window.prographSetActiveAccount === 'function') {
+        window.prographSetActiveAccount(name);
+        refreshAccountPanel();
+    }
+};
+
+window.saveGraphToAccount = function() {
+    const { graphNameInput } = getAccountPanelElements();
+    const name = normalizeAccountLabel(graphNameInput && graphNameInput.value) || 'Untitled Graph';
+
+    if (typeof window.prographSaveGraphToAccount === 'function') {
+        window.prographSaveGraphToAccount(name);
+        if (graphNameInput) graphNameInput.value = '';
+        refreshAccountPanel();
+    }
+};
+
+// Toggle the floating account panel
+function toggleAccountPanel() {
+    const panel = document.getElementById('floating-account-panel');
+    if (panel.style.display === 'none' || panel.style.display === '') {
+        panel.style.display = 'block';
+    } else {
+        panel.style.display = 'none';
+    }
+};
+
+// Switch workspace layouts
+// Switch workspace layouts
+function switchWorkspaceLayout(mode) {
+    const leftPanel = document.getElementById('left-panel');
+    const rightPanel = document.getElementById('right-panel');
+    const resizer = document.getElementById('resizer');
+    
+    // Clear any inline flex properties that might be stuck from the drag-resizer
+    leftPanel.style.flex = '';
+    rightPanel.style.flex = '';
+    leftPanel.style.maxWidth = '100%';
+    rightPanel.style.maxWidth = '100%';
+    
+    if (mode === 'both') {
+        leftPanel.style.display = 'flex';
+        rightPanel.style.display = 'flex';
+        if (resizer) resizer.style.display = 'block';
+        leftPanel.style.width = '50%';
+        rightPanel.style.width = '50%';
+    } else if (mode === 'canvas') {
+        leftPanel.style.display = 'flex';
+        leftPanel.style.width = '100%';
+        leftPanel.style.flex = '0 0 100%'; // Force Flexbox to allow full width
+        rightPanel.style.display = 'none';
+        if (resizer) resizer.style.display = 'none';
+    } else if (mode === 'code') {
+        leftPanel.style.display = 'none';
+        rightPanel.style.display = 'flex';
+        rightPanel.style.width = '100%';
+        rightPanel.style.flex = '0 0 100%'; // Force Flexbox to allow full width
+        if (resizer) resizer.style.display = 'none';
+    }
+    
+    // Dispatch window resize event so the canvas rescales correctly to the new layout
+    window.dispatchEvent(new Event('resize'));
+};
+
+
+
+function bootstrapAccountPanel() {
+    if (typeof window.prographSetActiveAccount === 'function') {
+        window.prographSetActiveAccount(window.prographGetActiveAccount ? window.prographGetActiveAccount() : 'Guest');
+    }
+    refreshAccountPanel();
+}
+
+window.addEventListener('DOMContentLoaded', bootstrapAccountPanel);
+

@@ -1,7 +1,16 @@
 const canvas = document.getElementById('graphCanvas');
 const ctx = canvas.getContext('2d');
 const dpr = window.devicePixelRatio || 1;
-document.getElementById('canvas-container').style.position = 'relative';
+const canvasContainer = document.getElementById('canvas-container');
+canvasContainer.style.position = 'relative';
+
+const overlayLayer = document.createElement('div');
+overlayLayer.id = 'math-overlay-layer';
+overlayLayer.style.position = 'absolute';
+overlayLayer.style.inset = '0';
+overlayLayer.style.pointerEvents = 'none';
+overlayLayer.style.zIndex = '6';
+canvasContainer.appendChild(overlayLayer);
 
 // Global error handlers: log full stack and attempt graceful recovery so UI doesn't remain frozen
 window.addEventListener('error', (ev) => {
@@ -415,6 +424,85 @@ function distToSegment(px, py, x1, y1, x2, y2) {
     return Math.hypot(px - (x1 + t * (x2 - x1)), py - (y1 + t * (y2 - y1)));
 }
 
+function clamp01(value, fallback = 0.5) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return fallback;
+    return Math.max(0, Math.min(1, n));
+}
+
+function getEdgeLabelAnchor(edge, p1, p2, s1, s2, unitSize) {
+    const t = clamp01(edge.labelT, 0.5);
+
+    if (edge.type === 'line' && p2) {
+        return {
+            x: s1.x + (s2.x - s1.x) * t,
+            y: s1.y + (s2.y - s1.y) * t,
+        };
+    }
+
+    if (edge.type === 'curve' && p2) {
+        const dScreen = (edge.offset || 0) * unitSize;
+        const dx = s2.x - s1.x;
+        const dy = s2.y - s1.y;
+        const len = Math.hypot(dx, dy) || 1;
+        const nx = dy / len;
+        const ny = -dx / len;
+        const cx = (s1.x + s2.x) / 2 + 2 * dScreen * nx;
+        const cy = (s1.y + s2.y) / 2 + 2 * dScreen * ny;
+
+        const omt = 1 - t;
+        return {
+            x: omt * omt * s1.x + 2 * omt * t * cx + t * t * s2.x,
+            y: omt * omt * s1.y + 2 * omt * t * cy + t * t * s2.y,
+        };
+    }
+
+    return { x: (s1.x + (s2 ? s2.x : s1.x)) / 2, y: (s1.y + (s2 ? s2.y : s1.y)) / 2 };
+}
+
+function rectsOverlap(a, b, gap = 4) {
+    return !(a.right + gap < b.left || a.left - gap > b.right || a.bottom + gap < b.top || a.top - gap > b.bottom);
+}
+
+function placeOverlayWithCollision(overlay, baseX, baseY, placedRects, containerRect) {
+    const candidates = [
+        { dx: 0, dy: 0 },
+        { dx: 0, dy: -16 },
+        { dx: 0, dy: 16 },
+        { dx: -16, dy: 0 },
+        { dx: 16, dy: 0 },
+        { dx: -18, dy: -18 },
+        { dx: 18, dy: -18 },
+        { dx: -18, dy: 18 },
+        { dx: 18, dy: 18 },
+        { dx: 0, dy: -30 },
+        { dx: 0, dy: 30 },
+    ];
+
+    let bestRect = null;
+    for (const c of candidates) {
+        overlay.style.left = (baseX + c.dx) + 'px';
+        overlay.style.top = (baseY + c.dy) + 'px';
+        const r = overlay.getBoundingClientRect();
+        const localRect = {
+            left: r.left - containerRect.left,
+            right: r.right - containerRect.left,
+            top: r.top - containerRect.top,
+            bottom: r.bottom - containerRect.top,
+        };
+
+        const insideCanvas = localRect.left >= 0 && localRect.top >= 0 && localRect.right <= canvasWidth && localRect.bottom <= canvasHeight;
+        const collides = placedRects.some(pr => rectsOverlap(localRect, pr));
+        if (insideCanvas && !collides) {
+            bestRect = localRect;
+            break;
+        }
+        if (!bestRect) bestRect = localRect;
+    }
+
+    if (bestRect) placedRects.push(bestRect);
+}
+
 window.applyPropertyToSelection = function(prop, value) {
     let changed = false;
     window.selectedPointIds.forEach(id => { let p = window.points.find(p => p.id === id); if(p) { p[prop] = value; changed = true; } });
@@ -642,7 +730,7 @@ function updatePropertyPanel() {
     const delBtn = document.getElementById('prop-delete-btn');
     
     // Hide all dynamic property wrappers by default
-    ['wrap-label','wrap-angle','wrap-pos','wrap-radius','wrap-offset','wrap-loop-angle','wrap-start','wrap-end','wrap-arrow','wrap-p-style','wrap-l-style'].forEach(id => { setDisplay(id, 'none'); });
+    ['wrap-label','wrap-text-multiline','wrap-text-box','wrap-label-t','wrap-angle','wrap-pos','wrap-radius','wrap-offset','wrap-loop-angle','wrap-start','wrap-end','wrap-arrow','wrap-p-style','wrap-l-style'].forEach(id => { setDisplay(id, 'none'); });
 
     if(delBtn) delBtn.disabled = true;
     if (pPlaceholder) pPlaceholder.innerText = "Select an item to edit"; // Default text
@@ -690,6 +778,7 @@ function updatePropertyPanel() {
         let e = window.edges.find(e => e.id === window.selectedEdgeIds[0]); if(!e) return;
         setDisplay('wrap-label', 'flex'); setValue('prop-label', e.label || "");
         setDisplay('wrap-pos', 'flex'); setValue('prop-label-pos', e.labelPos || "above");
+        if (['line', 'curve'].includes(e.type)) { setDisplay('wrap-label-t', 'flex'); setValue('prop-label-t', clamp01(e.labelT, 0.5)); }
         if (['line', 'curve', 'loop', 'arc', 'elliptic-arc'].includes(e.type)) { setDisplay('wrap-arrow', 'flex'); setValue('prop-arrow', e.arrow || "none"); }
         if (e.type === 'curve') { setDisplay('wrap-offset', 'flex'); setValue('prop-offset', e.offset); }
         if (['arc', 'elliptic-arc', 'circle', 'loop'].includes(e.type)) {
@@ -702,7 +791,8 @@ function updatePropertyPanel() {
         setInner('current-color', `<span class="color-box" style="background: ${window.getHexFromName(e.color)};"></span> ${e.color}`);
     } else if (window.selectedTextIds.length > 0) {
         let t = window.texts.find(t => t.id === window.selectedTextIds[0]); if(!t) return;
-        setDisplay('wrap-label', 'flex'); setValue('prop-label', t.text || "");
+        setDisplay('wrap-text-multiline', 'flex'); setValue('prop-text-multiline', t.text || "");
+        setDisplay('wrap-text-box', 'flex'); let b = el('prop-text-box'); if (b) b.checked = !!t.boxed;
         setInner('current-color', `<span class="color-box" style="background: ${window.getHexFromName(t.color)};"></span> ${t.color}`);
     } else if (window.selectedRegionIds.length > 0) {
         let r = window.regions.find(r => r.id === window.selectedRegionIds[0]); if(!r) return;
@@ -711,8 +801,11 @@ function updatePropertyPanel() {
 }
 
 document.getElementById('prop-label').addEventListener('input', (e) => { if (window.selectedTextIds.length > 0) applyPropertyToSelection('text', e.target.value); else applyPropertyToSelection('label', e.target.value); });
+document.getElementById('prop-text-multiline').addEventListener('input', (e) => applyPropertyToSelection('text', e.target.value));
+document.getElementById('prop-text-box').addEventListener('change', (e) => applyPropertyToSelection('boxed', !!e.target.checked));
 document.getElementById('prop-label-angle').addEventListener('input', (e) => applyPropertyToSelection('labelAngle', Number(e.target.value)));
 document.getElementById('prop-label-pos').addEventListener('change', (e) => applyPropertyToSelection('labelPos', e.target.value));
+document.getElementById('prop-label-t').addEventListener('input', (e) => applyPropertyToSelection('labelT', clamp01(e.target.value, 0.5)));
 document.getElementById('prop-arrow').addEventListener('change', (e) => applyPropertyToSelection('arrow', e.target.value));
 document.getElementById('prop-radius').addEventListener('input', (e) => applyPropertyToSelection('radius', Number(e.target.value)));
 document.getElementById('prop-offset').addEventListener('input', (e) => applyPropertyToSelection('offset', Number(e.target.value)));
@@ -858,7 +951,7 @@ canvas.addEventListener('mousedown', (e) => {
         input.onblur = () => {
             if(isFinished) return; isFinished = true;
             if (input.value) {
-                let newId = window.textIdCounter++; window.texts.push({ id: newId, x: m.x, y: m.y, text: input.value, color: window.activeColor });
+                let newId = window.textIdCounter++; window.texts.push({ id: newId, x: m.x, y: m.y, text: input.value, color: window.activeColor, boxed: false });
                 window.selectedTextIds = [newId]; window.selectedPointIds = []; window.selectedEdgeIds = []; window.selectedRegionIds = []; setMode('select', true); saveState();
             }
             try { if (input && input.isConnected) input.parentNode.removeChild(input); } catch(e) { console.error('Failed removing inline editor:', e); }
@@ -1433,7 +1526,10 @@ if (plotContainer) {
 window.draw = function() {
     ctx.clearRect(0, 0, canvasWidth, canvasHeight);
     let u = getUnitSize();
-    document.querySelectorAll('.math-overlay').forEach(el => el.remove());
+    overlayLayer.innerHTML = '';
+    const pointById = new Map(window.points.map(p => [p.id, p]));
+    const placedLabelRects = [];
+    const containerRect = canvasContainer.getBoundingClientRect();
     renderPlotCanvas();
 
     let isDark = document.body.classList.contains('dark-mode');
@@ -1468,14 +1564,14 @@ window.draw = function() {
     });
 
     window.edges.forEach(e => {
-        let p1 = window.points.find(p => p.id === e.sourceId); if (!p1) return; let s1 = mathToScreen(p1.x, p1.y); 
+        let p1 = pointById.get(e.sourceId); if (!p1) return; let s1 = mathToScreen(p1.x, p1.y); 
         ctx.strokeStyle = window.selectedEdgeIds.includes(e.id) ? 'rgba(255, 215, 0, 0.8)' : window.getHexFromName(e.color);
         ctx.lineWidth = window.selectedEdgeIds.includes(e.id) ? 5 : 2;
         ctx.setLineDash(e.style === 'dashed' ? [8, 8] : e.style === 'dotted' ? [3, 4] : []);
         ctx.beginPath(); let midX = s1.x; let midY = s1.y;
 
         if (e.type === 'line') {
-            let p2 = window.points.find(p => p.id === e.targetId); if (!p2) return; let s2 = mathToScreen(p2.x, p2.y);
+            let p2 = pointById.get(e.targetId); if (!p2) return; let s2 = mathToScreen(p2.x, p2.y);
             
             let r1 = p1.radius !== undefined ? p1.radius : 5;
             let r2 = p2.radius !== undefined ? p2.radius : 5;
@@ -1502,7 +1598,7 @@ window.draw = function() {
             }
             
         } else if (e.type === 'curve') {
-            let p2 = window.points.find(p => p.id === e.targetId); if (!p2) return; let s2 = mathToScreen(p2.x, p2.y);
+            let p2 = pointById.get(e.targetId); if (!p2) return; let s2 = mathToScreen(p2.x, p2.y);
             
             let r1 = p1.radius !== undefined ? p1.radius : 5;
             let r2 = p2.radius !== undefined ? p2.radius : 5;
@@ -1543,7 +1639,7 @@ window.draw = function() {
             let r = e.radius * u; ctx.arc(s1.x, s1.y, r, -e.startAngle*Math.PI/180, -e.endAngle*Math.PI/180, true); ctx.stroke();
             let mA = -(e.startAngle+e.endAngle)/2 * Math.PI/180; midX = s1.x+Math.cos(mA)*r; midY = s1.y+Math.sin(mA)*r;
         } else if (e.type === 'elliptic-arc') {
-            let p2 = window.points.find(p => p.id === e.targetId); if (!p2) return; let s2 = mathToScreen(p2.x, p2.y); 
+            let p2 = pointById.get(e.targetId); if (!p2) return; let s2 = mathToScreen(p2.x, p2.y); 
             let c = Math.hypot(p2.x-p1.x, p2.y-p1.y)/2; let a = Math.max(e.radius, c+0.01); let b = Math.sqrt(a*a - c*c);
             let rot = Math.atan2(s2.y-s1.y, s2.x-s1.x); let cx = (s1.x+s2.x)/2; let cy = (s1.y+s2.y)/2;
             ctx.ellipse(cx, cy, a*u, b*u, rot, -e.startAngle*Math.PI/180, -e.endAngle*Math.PI/180, true); ctx.stroke();
@@ -1555,14 +1651,17 @@ window.draw = function() {
         if (e.label) {
             let oX = 0; let oY = 0;
             if (e.labelPos === 'above') oY = -15; else if (e.labelPos === 'below') oY = 15; else if (e.labelPos === 'left') oX = -20; else if (e.labelPos === 'right') oX = 20;
+            const p2 = pointById.get(e.targetId);
+            const anchor = getEdgeLabelAnchor(e, p1, p2, s1, p2 ? mathToScreen(p2.x, p2.y) : null, u);
             let overlay = document.createElement('div'); overlay.className = 'math-overlay';
-            overlay.style.position = 'absolute'; overlay.style.left = (midX + oX) + 'px'; overlay.style.top = (midY + oY) + 'px';
+            overlay.style.position = 'absolute'; overlay.style.left = (anchor.x + oX) + 'px'; overlay.style.top = (anchor.y + oY) + 'px';
             overlay.style.transform = 'translate(-50%, -50%)'; overlay.style.color = window.getHexFromName(e.color); 
             overlay.style.backgroundColor = e.labelPos === 'on' ? '#ffffff' : 'rgba(255, 255, 255, 0.7)';
             overlay.style.padding = '2px 4px'; overlay.style.borderRadius = '4px';
             if (e.labelPos === 'on') overlay.style.border = '1px solid transparent';
-            overlay.style.pointerEvents = 'none'; document.getElementById('canvas-container').appendChild(overlay);
+            overlay.style.pointerEvents = 'none'; overlayLayer.appendChild(overlay);
             try { katex.render(e.label, overlay); } catch(err) { overlay.innerText = e.label; }
+            placeOverlayWithCollision(overlay, anchor.x + oX, anchor.y + oY, placedLabelRects, containerRect);
         }
     });
 
@@ -1572,8 +1671,27 @@ window.draw = function() {
         let overlay = document.createElement('div'); overlay.className = 'math-overlay';
         overlay.style.position = 'absolute'; overlay.style.left = s.x + 'px'; overlay.style.top = s.y + 'px';
         overlay.style.transform = 'translate(-50%, -50%)'; overlay.style.color = window.getHexFromName(t.color); overlay.style.pointerEvents = 'none';
-        document.getElementById('canvas-container').appendChild(overlay);
-        try { katex.render(t.text, overlay); } catch(err) { overlay.innerText = t.text; }
+        overlay.style.display = 'inline-flex';
+        overlay.style.flexDirection = 'column';
+        overlay.style.alignItems = 'center';
+        if (t.boxed) {
+            overlay.style.background = 'rgba(255,255,255,0.92)';
+            overlay.style.border = '1px solid rgba(30,30,30,0.45)';
+            overlay.style.borderRadius = '6px';
+            overlay.style.padding = '5px 7px';
+        }
+        overlayLayer.appendChild(overlay);
+        const lines = String(t.text || '').split(/\r?\n/).filter(line => line.length > 0);
+        if (lines.length === 0) {
+            overlay.innerText = '';
+            return;
+        }
+        lines.forEach((line, idx) => {
+            const lineEl = document.createElement('div');
+            if (idx > 0) lineEl.style.marginTop = '2px';
+            overlay.appendChild(lineEl);
+            try { katex.render(line, lineEl); } catch(err) { lineEl.innerText = line; }
+        });
     });
 
     window.points.forEach(p => {
@@ -1600,7 +1718,7 @@ window.draw = function() {
             let overlay = document.createElement('div'); overlay.className = 'math-overlay';
             overlay.style.position = 'absolute'; overlay.style.left = (s.x + Math.cos(r)*20) + 'px'; overlay.style.top = (s.y - Math.sin(r)*20) + 'px';
             overlay.style.transform = 'translate(-50%, -50%)'; overlay.style.color = '#333'; overlay.style.pointerEvents = 'none';
-            document.getElementById('canvas-container').appendChild(overlay);
+            overlayLayer.appendChild(overlay);
             try { katex.render(p.label, overlay); } catch(err) { overlay.innerText = p.label; }
         }
     });
@@ -1690,19 +1808,35 @@ window.exportImage = async function() {
 };
 
 window.exportJSON = function() {
+    const snapshot = typeof window.prographBuildGraphSnapshot === 'function'
+        ? window.prographBuildGraphSnapshot('Export')
+        : { points: window.points, edges: window.edges, texts: window.texts, regions: window.regions, plots: window.plots, originX, originY, zoom: window.zoom };
     let a = document.createElement('a'); a.download = "graph_data.json";
-    a.href = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({points: window.points, edges: window.edges, texts: window.texts, regions: window.regions, plots: window.plots, originX, originY, zoom: window.zoom}, null, 2)); a.click();
+    a.href = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(snapshot, null, 2)); a.click();
 }
 window.importJSON = function(e) {
+    const file = e && e.target && e.target.files ? e.target.files[0] : null;
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+        alert('Selected file is too large. Please import a JSON file under 5MB.');
+        return;
+    }
+
     let reader = new FileReader();
     reader.onload = function(ev) {
-        let obj = JSON.parse(ev.target.result); window.points = obj.points || []; window.edges = obj.edges || []; window.texts = obj.texts || []; window.regions = obj.regions || []; window.plots = obj.plots || [];
-        if (obj.originX !== undefined) originX = obj.originX; if (obj.originY !== undefined) originY = obj.originY; if (obj.zoom !== undefined) window.zoom = obj.zoom;
-        window.pointIdCounter = window.points.length ? Math.max(...window.points.map(p=>p.id))+1 : 0; window.edgeIdCounter = window.edges.length ? Math.max(...window.edges.map(e=>e.id))+1 : 0; 
-        window.textIdCounter = window.texts.length ? Math.max(...window.texts.map(t=>t.id))+1 : 0; window.regionIdCounter = window.regions.length ? Math.max(...window.regions.map(r=>r.id))+1 : 0; window.plotIdCounter = window.plots.length ? Math.max(...window.plots.map(pl=>pl.id))+1 : 0;
-        renderPlotCanvas();
-        saveState(); draw();
-    }; reader.readAsText(e.target.files[0]);
+        try {
+            const obj = JSON.parse(ev.target.result);
+            if (!obj || typeof obj !== 'object') throw new Error('Invalid JSON root object.');
+            if (typeof window.prographApplyGraphSnapshot === 'function') window.prographApplyGraphSnapshot(obj);
+            else throw new Error('Persistence helpers are unavailable.');
+        } catch (err) {
+            console.error('Failed to import JSON:', err);
+            alert('Could not import file. Please provide a valid grafGen JSON export.');
+        } finally {
+            if (e.target) e.target.value = '';
+        }
+    };
+    reader.readAsText(file);
 }
 
 // 🎨 UPDATED: Greedy Auto-Coloring Algorithm (Lowercase Fix)

@@ -9,6 +9,7 @@ grafGen bridges the gap between a tactile drawing application and a heavy comput
 * **Live Mathematical HUD:** Instantly calculates Order $|V|$, Size $|E|$, Degree $d(v)$, and the Eigenvalue Spectrum $Spec(A)$.
 * **Algorithmic Graph Theory:** Features built-in force-directed physics, greedy coloring algorithms, and BFS bipartite checking.
 * **Smart Exporting:** Download transparent, print-ready PNGs (even while working in Dark Mode) or export to Python's `NetworkX`.
+* **Local Accounts:** Save named graphs per browser profile and switch between stored workspaces without leaving the app.
 
 ---
 
@@ -74,6 +75,7 @@ Access the generated code from the right-hand panel.
 4. **Python (NetworkX):** Outputs a ready-to-run Python script that recreates your exact graph and its visual `(x, y)` coordinate layout.
 5. **Image:** Export a high-resolution, transparent PNG.
 6. **Save/Load JSON:** Save your active workspace locally and pick up right where you left off.
+7. **Local Accounts:** Store multiple saved graphs per account in your browser.
 
 ## 📈 XY Plot Table
 

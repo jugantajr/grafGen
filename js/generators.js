@@ -112,6 +112,19 @@ function collectIncidentCounts() {
     return incidentCount;
 }
 
+function splitAnnotationLines(text) {
+    return String(text || '')
+        .split(/\r?\n/)
+        .map(line => line.trim())
+        .filter(line => line.length > 0);
+}
+
+function clampLabelT(value, fallback = 0.5) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return fallback;
+    return Math.max(0, Math.min(1, n));
+}
+
 window.generateCode = function() {
     const format = document.getElementById('code-format').value;
     const out = document.getElementById('codeOutput');
@@ -228,12 +241,13 @@ window.generateCode = function() {
 
             let lbl = '';
             if (e.label && e.label !== '') {
-                if (e.labelPos === 'above') lbl = ` \\naput{ $${e.label}$}`;
-                else if (e.labelPos === 'below') lbl = ` \\nbput{ $${e.label}$}`;
-                else if (e.labelPos === 'left') lbl = ` \\ncput{\\uput[180](0,0){ $${e.label}$}}`;
-                else if (e.labelPos === 'right') lbl = ` \\ncput{\\uput[0](0,0){ $${e.label}$}}`;
-                else if (e.labelPos === 'on') lbl = ` \\ncput*{ $${e.label}$}`;
-                else lbl = ` \\naput{ $${e.label}$}`;
+                const npos = clampLabelT(e.labelT, 0.5).toFixed(2);
+                if (e.labelPos === 'above') lbl = ` \\naput[npos=${npos}]{ $${e.label}$}`;
+                else if (e.labelPos === 'below') lbl = ` \\nbput[npos=${npos}]{ $${e.label}$}`;
+                else if (e.labelPos === 'left') lbl = ` \\ncput[npos=${npos}]{\\uput[180](0,0){ $${e.label}$}}`;
+                else if (e.labelPos === 'right') lbl = ` \\ncput[npos=${npos}]{\\uput[0](0,0){ $${e.label}$}}`;
+                else if (e.labelPos === 'on') lbl = ` \\ncput*[npos=${npos}]{ $${e.label}$}`;
+                else lbl = ` \\naput[npos=${npos}]{ $${e.label}$}`;
             }
 
             const p1 = window.points.find(p => p.id === e.sourceId);
@@ -276,7 +290,20 @@ window.generateCode = function() {
 
         if (window.texts.length > 0) latex += '\n';
         window.texts.forEach(t => {
-            latex += `    \\rput(${t.x},${t.y}){${t.color === 'black' ? `$${t.text}$` : `\\textcolor{${t.color}}{$${t.text}$}`}}\n`;
+            const lines = splitAnnotationLines(t.text);
+            if (lines.length === 0) return;
+
+            const mathLines = lines.map(line => `$${line}$`);
+            let content = mathLines.length > 1 ? `\\shortstack{${mathLines.join('\\\\')}}` : mathLines[0];
+
+            if (t.color !== 'black') content = `\\textcolor{${t.color}}{${content}}`;
+
+            if (t.boxed) {
+                const boxColor = t.color === 'black' ? 'black' : t.color;
+                content = `\\psframebox[fillstyle=solid,fillcolor=white,framesep=3pt,linecolor=${boxColor}]{${content}}`;
+            }
+
+            latex += `    \\rput(${t.x},${t.y}){${content}}\n`;
         });
         latex += '\\end{pspicture}';
     } else {
@@ -332,12 +359,15 @@ window.generateCode = function() {
             const edgeStyleName = edgeStyleRegistry.nameFor(edgeKey, `draw=${e.color}, thick${e.style === 'dashed' ? ', dashed' : e.style === 'dotted' ? ', dotted' : ''}`);
             let lbl = '';
             if (e.label && e.label !== '') {
+                const posT = clampLabelT(e.labelT, 0.5).toFixed(2);
                 let pos = '';
                 if (e.labelPos === 'above') pos = 'above';
                 else if (e.labelPos === 'below') pos = 'below';
                 else if (e.labelPos === 'left') pos = 'left';
                 else if (e.labelPos === 'right') pos = 'right';
-                const fillOpts = e.labelPos === 'on' ? 'fill=white, inner sep=2pt' : `fill=white, inner sep=2pt, ${pos}`;
+                const fillOpts = e.labelPos === 'on'
+                    ? `fill=white, inner sep=2pt, pos=${posT}`
+                    : `fill=white, inner sep=2pt, ${pos}, pos=${posT}`;
                 lbl = ` node[${fillOpts}] { $${e.label}$}`;
             }
 
@@ -382,7 +412,16 @@ window.generateCode = function() {
 
         if (window.texts.length > 0) latex += '\n';
         window.texts.forEach(t => {
-            latex += `    \\node${t.color === 'black' ? '' : `[text=${t.color}]`} at (${t.x},${t.y}) {$${t.text}$};\n`;
+            const lines = splitAnnotationLines(t.text);
+            if (lines.length === 0) return;
+
+            const opts = [];
+            if (t.color !== 'black') opts.push(`text=${t.color}`);
+            if (lines.length > 1) opts.push('align=center');
+            if (t.boxed) opts.push('draw=black, rounded corners=2pt, fill=white, inner sep=3pt, align=center');
+
+            const content = lines.map(line => `$${line}$`).join('\\\\');
+            latex += `    \\node${opts.length ? `[${opts.join(', ')}]` : ''} at (${t.x},${t.y}) {${content}};\n`;
         });
         latex += '\\end{tikzpicture}';
     }
