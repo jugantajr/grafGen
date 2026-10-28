@@ -146,6 +146,9 @@
                     <option value="Prism">Prism (n-gonal)</option>
                     <option value="House">House</option>
                     <option value="Q3">Hypercube (Q3)</option>
+                    <option value="Petersen">Petersen</option>
+                    <option value="Friendship">Friendship (F n)</option>
+                    <option value="Tadpole">Tadpole (T n)</option>
                 </select>
                 <input type="number" id="macro-n" value="3" min="1" max="50" style="width: 45px;" title="Nodes (n)">
                 <input type="number" id="macro-m" value="3" min="1" max="50" style="width: 45px; display: none;" title="Left Partition (m)">
@@ -337,6 +340,7 @@
                         <li><b>Grid:</b> Generates a perfect $m \times n$ rectangular lattice.</li>
                         <li><b>Ladder / Prism / House:</b> Generates ladder graphs, prism graphs, and a compact house-shaped graph.</li>
                         <li><b>Q3 (Hypercube):</b> Spawns a 3D projected hypercube.</li>
+                        <li><b>Petersen / Friendship / Tadpole:</b> Generates classic named graph families for experimentation.</li>
                         <li><span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 5px; color: #6f42c1; font-size: 18px;">auto_fix_high</span> <b>Magic Untangle:</b> Uses spring-physics to physically repel nodes and untangle messy crossing edges.</li>
                         <li><span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 5px; color: #e83e8c; font-size: 18px;">palette</span> <b>Auto-Color:</b> Uses a greedy algorithm to instantly color the graph without adjacent nodes sharing a color.</li>
                         <li><span class="material-symbols-outlined" style="vertical-align: middle; margin-right: 5px; color: #20c997; font-size: 18px;">call_split</span> <b>Bipartite Snapper:</b> Tests if the graph is bipartite. If yes, it physically snaps into two colored sets. If no, it highlights the odd-length cycle in red.</li>

@@ -60,6 +60,8 @@ Stop drawing standard graphs by hand. Instantly generate common structures:
 * **Lattice Grid ($m \times n$)**
 * **Ladder ($L_n$), Prism, and House graphs**
 * **3D Hypercube ($Q_3$)**
+* **Petersen graph**
+* **Friendship ($F_n$) and Tadpole ($T_n$) graphs**
 
 The Macros panel is hidden by default and can be revealed from the toolbar when needed.
 
