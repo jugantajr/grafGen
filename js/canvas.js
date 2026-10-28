@@ -658,6 +658,59 @@ window.insertMacro = function() {
         });
         let edges = [ [0,1], [1,2], [2,3], [3,0], [4,5], [5,6], [6,7], [7,4], [0,4], [1,5], [2,6], [3,7] ];
         edges.forEach(pair => { window.edges.push({ id: window.edgeIdCounter++, type: 'line', sourceId: newPts[pair[0]], targetId: newPts[pair[1]], color: window.activeColor, style: 'solid', arrow: 'none', label: "", labelPos: 'above' }); });
+    } else if (type === 'Petersen') {
+        let outerIds = []; let innerIds = []; let outerRadius = 4; let innerRadius = 1.8;
+        for (let i = 0; i < 5; i++) {
+            let angle = -Math.PI / 2 + (i * 2 * Math.PI) / 5;
+            let outerId = window.pointIdCounter++;
+            let innerId = window.pointIdCounter++;
+            outerIds.push(outerId);
+            innerIds.push(innerId);
+            window.points.push({ id: outerId, x: cx + outerRadius * Math.cos(angle), y: cy - outerRadius * Math.sin(angle), color: window.activeColor, style: 'solid', label: String(startLbl + i), labelAngle: Math.round((-angle * 180 / Math.PI + 360) % 360) });
+            window.points.push({ id: innerId, x: cx + innerRadius * Math.cos(angle), y: cy - innerRadius * Math.sin(angle), color: window.activeColor, style: 'solid', label: String(startLbl + 5 + i), labelAngle: Math.round((-angle * 180 / Math.PI + 360) % 360) });
+        }
+        for (let i = 0; i < 5; i++) {
+            let next = (i + 1) % 5;
+            let starTarget = (i + 2) % 5;
+            [[outerIds[i], outerIds[next]], [innerIds[i], innerIds[starTarget]], [outerIds[i], innerIds[i]]].forEach(([sourceId, targetId]) => {
+                window.edges.push({ id: window.edgeIdCounter++, type: 'line', sourceId, targetId, color: window.activeColor, style: 'solid', arrow: 'none', label: '', labelPos: 'above' });
+            });
+        }
+    } else if (type === 'Friendship') {
+        let triangleCount = Math.max(1, n); let centerId = window.pointIdCounter++;
+        window.points.push({ id: centerId, x: cx, y: cy, color: window.activeColor, style: 'solid', label: String(startLbl), labelAngle: 90 });
+        for (let i = 0; i < triangleCount; i++) {
+            let angle = -Math.PI / 2 + (i * 2 * Math.PI) / triangleCount;
+            let pairAngle = Math.PI / (triangleCount * 2);
+            let firstId = window.pointIdCounter++;
+            let secondId = window.pointIdCounter++;
+            let firstAngle = angle - pairAngle;
+            let secondAngle = angle + pairAngle;
+            window.points.push({ id: firstId, x: cx + 3.2 * Math.cos(firstAngle), y: cy - 3.2 * Math.sin(firstAngle), color: window.activeColor, style: 'solid', label: String(startLbl + 1 + i * 2), labelAngle: 90 });
+            window.points.push({ id: secondId, x: cx + 3.2 * Math.cos(secondAngle), y: cy - 3.2 * Math.sin(secondAngle), color: window.activeColor, style: 'solid', label: String(startLbl + 2 + i * 2), labelAngle: 90 });
+            [[centerId, firstId], [centerId, secondId], [firstId, secondId]].forEach(([sourceId, targetId]) => {
+                window.edges.push({ id: window.edgeIdCounter++, type: 'line', sourceId, targetId, color: window.activeColor, style: 'solid', arrow: 'none', label: '', labelPos: 'above' });
+            });
+        }
+    } else if (type === 'Tadpole') {
+        let cycleSize = Math.max(3, n); let cycleRadius = Math.max(2.5, cycleSize * 0.45); let cycleIds = [];
+        for (let i = 0; i < cycleSize; i++) {
+            let angle = -Math.PI / 2 + (i * 2 * Math.PI) / cycleSize;
+            let id = window.pointIdCounter++;
+            cycleIds.push(id);
+            window.points.push({ id, x: cx - 2.5 + cycleRadius * Math.cos(angle), y: cy - cycleRadius * Math.sin(angle), color: window.activeColor, style: 'solid', label: String(startLbl + i), labelAngle: Math.round((-angle * 180 / Math.PI + 360) % 360) });
+        }
+        for (let i = 0; i < cycleSize; i++) {
+            window.edges.push({ id: window.edgeIdCounter++, type: 'line', sourceId: cycleIds[i], targetId: cycleIds[(i + 1) % cycleSize], color: window.activeColor, style: 'solid', arrow: 'none', label: '', labelPos: 'above' });
+        }
+        let previousId = cycleIds[0];
+        let tailLength = Math.max(1, Math.floor(n / 2));
+        for (let i = 0; i < tailLength; i++) {
+            let id = window.pointIdCounter++;
+            window.points.push({ id, x: cx + 2 + i * 2, y: cy, color: window.activeColor, style: 'solid', label: String(startLbl + cycleSize + i), labelAngle: 90 });
+            window.edges.push({ id: window.edgeIdCounter++, type: 'line', sourceId: previousId, targetId: id, color: window.activeColor, style: 'solid', arrow: 'none', label: '', labelPos: 'above' });
+            previousId = id;
+        }
     }
     saveState(); window.setMode('select'); 
 };
