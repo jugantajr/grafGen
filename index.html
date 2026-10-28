@@ -152,6 +152,36 @@
                 </select>
                 <input type="number" id="macro-n" value="3" min="1" max="50" style="width: 45px;" title="Nodes (n)">
                 <input type="number" id="macro-m" value="3" min="1" max="50" style="width: 45px; display: none;" title="Left Partition (m)">
+                <select id="macro-operation" onchange="toggleMacroInputs()" title="Graph operation">
+                    <option value="single">Single macro</option>
+                    <option value="union">Disjoint union</option>
+                    <option value="join">Join</option>
+                    <option value="cartesian">Cartesian product</option>
+                    <option value="tensor">Direct / tensor product</option>
+                    <option value="strong">Strong product</option>
+                    <option value="lexicographic">Lexicographic product</option>
+                    <option value="corona">Corona product</option>
+                </select>
+                <span id="macro-second-controls" style="display: none; align-items: center; gap: 4px;">
+                    <select id="macro-second-type" title="Second graph macro">
+                        <option value="Kn">Complete (Kn)</option>
+                        <option value="Cn">Cycle (Cn)</option>
+                        <option value="Star">Star (K1,n)</option>
+                        <option value="Pn">Path (Pn)</option>
+                        <option value="Km,n">Bipartite (Km,n)</option>
+                        <option value="Wn">Wheel (Wn)</option>
+                        <option value="Grid">Grid (m x n)</option>
+                        <option value="Ladder">Ladder (Ln)</option>
+                        <option value="Prism">Prism (n-gonal)</option>
+                        <option value="House">House</option>
+                        <option value="Q3">Hypercube (Q3)</option>
+                        <option value="Petersen">Petersen</option>
+                        <option value="Friendship">Friendship (Fn)</option>
+                        <option value="Tadpole">Tadpole (Tn)</option>
+                    </select>
+                    <input type="number" id="macro-second-n" value="3" min="1" max="50" style="width: 45px;" title="Second graph n">
+                    <input type="number" id="macro-second-m" value="3" min="1" max="50" style="width: 45px;" title="Second graph m">
+                </span>
                 <button onclick="insertMacro()" style="background: #28a745; color: white; border-color: #218838; font-weight: bold;" title="Insert Graph">Insert</button>
             </div>
         </div>
@@ -433,5 +463,6 @@
     <script src="js/persistence.js"></script>
     <script src="js/codeImporter.js"></script>
     <script src="js/canvas.js"></script>
+    <script src="js/graphOperations.js"></script>
 </body>
 </html>

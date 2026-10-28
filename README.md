@@ -65,6 +65,9 @@ Stop drawing standard graphs by hand. Instantly generate common structures:
 
 The Macros panel is hidden by default and can be revealed from the toolbar when needed.
 
+The Macros panel also combines any two listed macros with disjoint union, join, Cartesian,
+direct/tensor, strong, lexicographic, or corona products.
+
 ---
 
 ## 💾 Output & Export Options
